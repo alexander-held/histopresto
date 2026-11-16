@@ -1,0 +1,25 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "histopresto"
+version = "0.1.0"
+description = "HistFactory statistical model with a C kernel: likelihood with analytic gradient, minimisation and inference"
+authors = [{ name = "Alexander Held" }]
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["numpy"]
+
+[project.urls]
+Repository = "https://github.com/alexander-held/histopresto"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+wheel.packages = ["src/histopresto"]
+wheel.py-api = "py3"  # the kernel is loaded with ctypes, so the wheel does not depend on the Python version
+wheel.exclude = ["**/*.c"]

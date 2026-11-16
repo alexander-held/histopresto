@@ -1,0 +1,18 @@
+{
+  "name": "@histopresto/core",
+  "version": "0.1.0",
+  "description": "HistFactory statistical model: likelihood with analytic gradient, minimisation and inference",
+  "author": "Alexander Held",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexander-held/histopresto.git",
+    "directory": "js/core"
+  },
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ],
+  "sideEffects": false
+}

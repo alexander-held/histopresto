@@ -1,0 +1,30 @@
+[workspace]
+name = "histopresto"
+authors = ["Alexander Held"]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[dependencies]
+python = "3.12.*"
+numpy = "*"
+scipy = "*"
+nodejs = ">=22"
+c-compiler = "*"
+cmake = "*"
+ninja = "*"
+pytest = "*"
+
+[pypi-dependencies]
+histopresto = { path = "python", editable = true }
+pyhf = ">=0.7.6, <0.8"
+iminuit = ">=2.33.0, <3"
+
+[tasks]
+npm-install = { cmd = "npm install", inputs = ["package.json", "js/*/package.json"], outputs = ["node_modules/.package-lock.json"] }
+test-js = { cmd = "npm test", depends-on = ["npm-install"] }
+test-py = { cmd = "pytest tests/python tests/cross", depends-on = ["npm-install"] }
+test = { depends-on = ["test-js", "test-py"] }
+build-app = { cmd = "npm run build", depends-on = ["npm-install"] }
+serve = { cmd = "npm run serve --workspace js/app", depends-on = ["npm-install"] }
+reference = "python tests/reference/export_reference.py"
+logo = "python scripts/make_logo.py -o assets/logo.svg && python scripts/make_logo.py --dark -o assets/logo-dark.svg && python scripts/make_logo.py --mark-only -o assets/icon.svg && python scripts/make_logo.py --mark-only --dark -o assets/icon-dark.svg"

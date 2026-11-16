@@ -1,0 +1,1418 @@
+{
+ "channels": [
+  {
+   "name": "SR",
+   "samples": [
+    {
+     "name": "signal",
+     "data": [
+      1.5,
+      4,
+      9,
+      14,
+      11,
+      6
+     ],
+     "modifiers": [
+      {
+       "name": "mu",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.03,
+        "lo": 0.97
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "signal_theory",
+       "type": "normsys",
+       "data": {
+        "hi": 1.08,
+        "lo": 0.92
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         1.425,
+         3.88,
+         8.91,
+         14.14,
+         11.33,
+         6.3
+        ],
+        "lo_data": [
+         1.575,
+         4.12,
+         9.09,
+         13.86,
+         10.67,
+         5.7
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         1.455,
+         3.928,
+         8.946,
+         14.084,
+         11.198,
+         6.18
+        ],
+        "lo_data": [
+         1.545,
+         4.072,
+         9.054,
+         13.916,
+         10.802,
+         5.82
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_SR",
+       "type": "staterror",
+       "data": [
+        0.4287,
+        0.7,
+        1.05,
+        1.3096,
+        1.1608,
+        0.8573
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ttbar",
+     "data": [
+      160,
+      110,
+      70,
+      40,
+      22,
+      10
+     ],
+     "modifiers": [
+      {
+       "name": "k_ttbar",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.05,
+        "lo": 0.95
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         150.4,
+         106.04,
+         69.16,
+         40.48,
+         22.792,
+         10.6
+        ],
+        "lo_data": [
+         169.6,
+         113.96,
+         70.84,
+         39.52,
+         21.208,
+         9.4
+        ]
+       }
+      },
+      {
+       "name": "ttbar_modelling",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         140.8,
+         102.08,
+         68.32,
+         40.96,
+         23.584,
+         11.2
+        ],
+        "lo_data": [
+         179.2,
+         117.92,
+         71.68,
+         39.04,
+         20.416,
+         8.8
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         155.2,
+         108.02,
+         69.58,
+         40.24,
+         22.396,
+         10.3
+        ],
+        "lo_data": [
+         164.8,
+         111.98,
+         70.42,
+         39.76,
+         21.604,
+         9.7
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_SR",
+       "type": "staterror",
+       "data": [
+        4.4272,
+        3.6708,
+        2.9283,
+        2.2136,
+        1.6416,
+        1.1068
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Wjets",
+     "data": [
+      90,
+      55,
+      30,
+      16,
+      8,
+      4
+     ],
+     "modifiers": [
+      {
+       "name": "k_Wjets",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.07,
+        "lo": 0.9299999999999999
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 0.95,
+        "lo": 1.05
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         82.8,
+         52.36,
+         29.52,
+         16.256,
+         8.384,
+         4.32
+        ],
+        "lo_data": [
+         97.2,
+         57.64,
+         30.48,
+         15.744,
+         7.616,
+         3.68
+        ]
+       }
+      },
+      {
+       "name": "Wjets_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         76.5,
+         50.05,
+         29.1,
+         16.48,
+         8.72,
+         4.6
+        ],
+        "lo_data": [
+         103.5,
+         59.95,
+         30.9,
+         15.52,
+         7.28,
+         3.4
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         86.4,
+         53.68,
+         29.76,
+         16.128,
+         8.192,
+         4.16
+        ],
+        "lo_data": [
+         93.6,
+         56.32,
+         30.24,
+         15.872,
+         7.808,
+         3.84
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_SR",
+       "type": "staterror",
+       "data": [
+        3.3204,
+        2.5957,
+        1.917,
+        1.4,
+        0.9899,
+        0.7
+       ]
+      }
+     ]
+    },
+    {
+     "name": "single_top",
+     "data": [
+      30,
+      22,
+      15,
+      9,
+      5,
+      2.5
+     ],
+     "modifiers": [
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.05,
+        "lo": 0.95
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "single_top_xsec",
+       "type": "normsys",
+       "data": {
+        "hi": 1.06,
+        "lo": 0.94
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         29.1,
+         21.604,
+         14.91,
+         9.054,
+         5.09,
+         2.575
+        ],
+        "lo_data": [
+         30.9,
+         22.396,
+         15.09,
+         8.946,
+         4.91,
+         2.425
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_SR",
+       "type": "staterror",
+       "data": [
+        1.917,
+        1.6416,
+        1.3555,
+        1.05,
+        0.7826,
+        0.5534
+       ]
+      }
+     ]
+    },
+    {
+     "name": "diboson",
+     "data": [
+      12,
+      10,
+      8,
+      6,
+      4,
+      2.5
+     ],
+     "modifiers": [
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.06,
+        "lo": 0.94
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 0.96,
+        "lo": 1.04
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "diboson_xsec",
+       "type": "normsys",
+       "data": {
+        "hi": 1.2,
+        "lo": 0.8
+       }
+      },
+      {
+       "name": "mc_stat_SR",
+       "type": "staterror",
+       "data": [
+        1.2124,
+        1.1068,
+        0.9899,
+        0.8573,
+        0.7,
+        0.5534
+       ]
+      }
+     ]
+    },
+    {
+     "name": "fakes",
+     "data": [
+      25,
+      12,
+      6,
+      3,
+      1.5,
+      0.8
+     ],
+     "modifiers": [
+      {
+       "name": "fake_rate",
+       "type": "normsys",
+       "data": {
+        "hi": 1.3,
+        "lo": 0.7
+       }
+      },
+      {
+       "name": "mc_stat_SR",
+       "type": "staterror",
+       "data": [
+        1.75,
+        1.2124,
+        0.8573,
+        0.6062,
+        0.4287,
+        0.313
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CR_ttbar",
+   "samples": [
+    {
+     "name": "signal",
+     "data": [
+      0.5,
+      0.8,
+      0.6,
+      0.3
+     ],
+     "modifiers": [
+      {
+       "name": "mu",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.03,
+        "lo": 0.97
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "signal_theory",
+       "type": "normsys",
+       "data": {
+        "hi": 1.08,
+        "lo": 0.92
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         0.475,
+         0.7867,
+         0.61,
+         0.315
+        ],
+        "lo_data": [
+         0.525,
+         0.8133,
+         0.59,
+         0.285
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         0.485,
+         0.792,
+         0.606,
+         0.309
+        ],
+        "lo_data": [
+         0.515,
+         0.808,
+         0.594,
+         0.291
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_ttbar",
+       "type": "staterror",
+       "data": [
+        0.2475,
+        0.313,
+        0.2711,
+        0.1917
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ttbar",
+     "data": [
+      900,
+      650,
+      380,
+      170
+     ],
+     "modifiers": [
+      {
+       "name": "k_ttbar",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.05,
+        "lo": 0.95
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         846,
+         637,
+         387.6,
+         180.2
+        ],
+        "lo_data": [
+         954,
+         663,
+         372.4,
+         159.8
+        ]
+       }
+      },
+      {
+       "name": "ttbar_modelling",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         792,
+         624,
+         395.2,
+         190.4
+        ],
+        "lo_data": [
+         1008,
+         676,
+         364.8,
+         149.6
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         873,
+         643.5,
+         383.8,
+         175.1
+        ],
+        "lo_data": [
+         927,
+         656.5,
+         376.2,
+         164.9
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_ttbar",
+       "type": "staterror",
+       "data": [
+        10.5,
+        8.9233,
+        6.8228,
+        4.5634
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Wjets",
+     "data": [
+      80,
+      50,
+      25,
+      10
+     ],
+     "modifiers": [
+      {
+       "name": "k_Wjets",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.07,
+        "lo": 0.9299999999999999
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 0.95,
+        "lo": 1.05
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         73.6,
+         48.6667,
+         25.6667,
+         10.8
+        ],
+        "lo_data": [
+         86.4,
+         51.3333,
+         24.3333,
+         9.2
+        ]
+       }
+      },
+      {
+       "name": "Wjets_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         68,
+         47.5,
+         26.25,
+         11.5
+        ],
+        "lo_data": [
+         92,
+         52.5,
+         23.75,
+         8.5
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         76.8,
+         49.3333,
+         25.3333,
+         10.4
+        ],
+        "lo_data": [
+         83.2,
+         50.6667,
+         24.6667,
+         9.6
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_ttbar",
+       "type": "staterror",
+       "data": [
+        3.1305,
+        2.4749,
+        1.75,
+        1.1068
+       ]
+      }
+     ]
+    },
+    {
+     "name": "single_top",
+     "data": [
+      110,
+      80,
+      45,
+      20
+     ],
+     "modifiers": [
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.05,
+        "lo": 0.95
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "single_top_xsec",
+       "type": "normsys",
+       "data": {
+        "hi": 1.06,
+        "lo": 0.94
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         106.7,
+         79.2,
+         45.45,
+         20.6
+        ],
+        "lo_data": [
+         113.3,
+         80.8,
+         44.55,
+         19.4
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_ttbar",
+       "type": "staterror",
+       "data": [
+        3.6708,
+        3.1305,
+        2.3479,
+        1.5652
+       ]
+      }
+     ]
+    },
+    {
+     "name": "fakes",
+     "data": [
+      40,
+      20,
+      9,
+      3
+     ],
+     "modifiers": [
+      {
+       "name": "fake_rate",
+       "type": "normsys",
+       "data": {
+        "hi": 1.3,
+        "lo": 0.7
+       }
+      },
+      {
+       "name": "mc_stat_CR_ttbar",
+       "type": "staterror",
+       "data": [
+        2.2136,
+        1.5652,
+        1.05,
+        0.6062
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "CR_Wjets",
+   "samples": [
+    {
+     "name": "signal",
+     "data": [
+      0.3,
+      0.4,
+      0.2
+     ],
+     "modifiers": [
+      {
+       "name": "mu",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.03,
+        "lo": 0.97
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "signal_theory",
+       "type": "normsys",
+       "data": {
+        "hi": 1.08,
+        "lo": 0.92
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         0.285,
+         0.4,
+         0.21
+        ],
+        "lo_data": [
+         0.315,
+         0.4,
+         0.19
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         0.291,
+         0.4,
+         0.206
+        ],
+        "lo_data": [
+         0.309,
+         0.4,
+         0.194
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_Wjets",
+       "type": "staterror",
+       "data": [
+        0.1917,
+        0.2214,
+        0.1565
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ttbar",
+     "data": [
+      140,
+      90,
+      40
+     ],
+     "modifiers": [
+      {
+       "name": "k_ttbar",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.05,
+        "lo": 0.95
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 1.04,
+        "lo": 0.96
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         131.6,
+         90,
+         42.4
+        ],
+        "lo_data": [
+         148.4,
+         90,
+         37.6
+        ]
+       }
+      },
+      {
+       "name": "ttbar_modelling",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         123.2,
+         90,
+         44.8
+        ],
+        "lo_data": [
+         156.8,
+         90,
+         35.2
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         135.8,
+         90,
+         41.2
+        ],
+        "lo_data": [
+         144.2,
+         90,
+         38.8
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_Wjets",
+       "type": "staterror",
+       "data": [
+        4.1413,
+        3.3204,
+        2.2136
+       ]
+      }
+     ]
+    },
+    {
+     "name": "Wjets",
+     "data": [
+      1200,
+      700,
+      300
+     ],
+     "modifiers": [
+      {
+       "name": "k_Wjets",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.07,
+        "lo": 0.9299999999999999
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 0.95,
+        "lo": 1.05
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         1104,
+         700,
+         324
+        ],
+        "lo_data": [
+         1296,
+         700,
+         276
+        ]
+       }
+      },
+      {
+       "name": "Wjets_scale",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         1020,
+         700,
+         345
+        ],
+        "lo_data": [
+         1380,
+         700,
+         255
+        ]
+       }
+      },
+      {
+       "name": "jet_energy_resolution",
+       "type": "histosys",
+       "data": {
+        "hi_data": [
+         1152,
+         700,
+         312
+        ],
+        "lo_data": [
+         1248,
+         700,
+         288
+        ]
+       }
+      },
+      {
+       "name": "mc_stat_CR_Wjets",
+       "type": "staterror",
+       "data": [
+        12.1244,
+        9.2601,
+        6.0622
+       ]
+      }
+     ]
+    },
+    {
+     "name": "diboson",
+     "data": [
+      60,
+      45,
+      25
+     ],
+     "modifiers": [
+      {
+       "name": "lumi",
+       "type": "lumi",
+       "data": null
+      },
+      {
+       "name": "jet_energy_scale",
+       "type": "normsys",
+       "data": {
+        "hi": 1.06,
+        "lo": 0.94
+       }
+      },
+      {
+       "name": "b_tagging",
+       "type": "normsys",
+       "data": {
+        "hi": 0.96,
+        "lo": 1.04
+       }
+      },
+      {
+       "name": "lepton_efficiency",
+       "type": "normsys",
+       "data": {
+        "hi": 1.015,
+        "lo": 0.985
+       }
+      },
+      {
+       "name": "diboson_xsec",
+       "type": "normsys",
+       "data": {
+        "hi": 1.2,
+        "lo": 0.8
+       }
+      },
+      {
+       "name": "mc_stat_CR_Wjets",
+       "type": "staterror",
+       "data": [
+        2.7111,
+        2.3479,
+        1.75
+       ]
+      }
+     ]
+    },
+    {
+     "name": "fakes",
+     "data": [
+      90,
+      40,
+      15
+     ],
+     "modifiers": [
+      {
+       "name": "fake_rate",
+       "type": "normsys",
+       "data": {
+        "hi": 1.3,
+        "lo": 0.7
+       }
+      },
+      {
+       "name": "mc_stat_CR_Wjets",
+       "type": "staterror",
+       "data": [
+        3.3204,
+        2.2136,
+        1.3555
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "observations": [
+  {
+   "name": "CR_Wjets",
+   "data": [
+    1481,
+    982,
+    442
+   ]
+  },
+  {
+   "name": "CR_ttbar",
+   "data": [
+    1173,
+    773,
+    425,
+    189
+   ]
+  },
+  {
+   "name": "SR",
+   "data": [
+    302,
+    220,
+    140,
+    97,
+    55,
+    31
+   ]
+  }
+ ],
+ "measurements": [
+  {
+   "name": "search",
+   "config": {
+    "poi": "mu",
+    "parameters": [
+     {
+      "name": "lumi",
+      "inits": [
+       1
+      ],
+      "bounds": [
+       [
+        0.9,
+        1.1
+       ]
+      ],
+      "auxdata": [
+       1
+      ],
+      "sigmas": [
+       0.017
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "version": "1.0.0"
+}

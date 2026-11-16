@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>histopresto: HistFactory fitter</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <span class="title">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="icon-dark.svg">
+      <img src="icon.svg" alt="" width="26" height="26">
+    </picture>
+    histopresto
+  </span>
+  <span class="note">HistFactory fits that run entirely in this browser tab. Nothing is uploaded.</span>
+</header>
+<main>
+  <section id="loader" class="loader">
+    <div class="full">
+      <h1>Fit a pyhf workspace</h1>
+      <p>Drop a workspace JSON file here to fit it and look at pulls, correlations, the ranking, likelihood scans, limits and pre- and post-fit yields.</p>
+      <div class="row">
+        <button id="choose" class="primary">Choose file</button>
+        <button id="paste-toggle">Paste JSON</button>
+      </div>
+      <div id="paste" hidden>
+        <textarea id="paste-text" spellcheck="false" aria-label="Workspace JSON" placeholder='{"channels": [...], "observations": [...], "measurements": [...], "version": "1.0.0"}'></textarea>
+        <button id="paste-load">Load pasted workspace</button>
+      </div>
+      <div class="examples">or start from an example<div class="row" id="examples"></div></div>
+    </div>
+    <div class="brief">
+      <span class="file" id="file-name"></span>
+      <span class="dim" id="file-info"></span>
+    </div>
+    <button id="another" class="brief quiet">Load another workspace</button>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+  </section>
+  <div id="error" class="error" role="alert" hidden></div>
+
+  <div id="workspace" hidden>
+    <div class="bar">
+      <label id="measurement-label">measurement <select id="measurement"></select></label>
+      <label id="poi-label">range of <span id="poi-name" class="mono"></span>
+        <input id="poi-lo" type="number" step="any" aria-label="lower bound of the parameter of interest"> to
+        <input id="poi-hi" type="number" step="any" aria-label="upper bound of the parameter of interest">
+      </label>
+      <button id="fit" class="primary">Fit</button>
+      <span id="status" class="status" role="status"></span>
+      <button id="download" disabled>Download results</button>
+    </div>
+    <div id="progress" class="progress" hidden>
+      <div class="track"><div class="fill" id="progress-fill"></div></div>
+      <span id="progress-label"></span>
+      <button id="cancel" class="quiet">Cancel</button>
+    </div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <section class="view" id="view"></section>
+  </div>
+</main>
+<script src="examples/index.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

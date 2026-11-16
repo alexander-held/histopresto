@@ -1,0 +1,17 @@
+{
+  "name": "@histopresto/viz",
+  "version": "0.1.0",
+  "description": "SVG figures for HistFactory fit results: pulls, correlations, ranking, yields, scans, limits",
+  "author": "Alexander Held",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexander-held/histopresto.git",
+    "directory": "js/viz"
+  },
+  "type": "module",
+  "exports": "./src/index.js",
+  "files": [
+    "src"
+  ]
+}

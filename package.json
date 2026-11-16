@@ -1,0 +1,20 @@
+{
+  "name": "histopresto",
+  "author": "Alexander Held",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexander-held/histopresto.git"
+  },
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "js/core",
+    "js/viz",
+    "js/app"
+  ],
+  "scripts": {
+    "test": "node --test \"tests/js/*.test.js\"",
+    "build": "npm run build --workspace js/app"
+  }
+}

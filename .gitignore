@@ -1,0 +1,11 @@
+.pixi/
+node_modules/
+__pycache__/
+*.egg-info/
+build/
+dist/
+libkernel.dylib
+libkernel.so
+.vscode/
+.DS_Store
+.pytest_cache/

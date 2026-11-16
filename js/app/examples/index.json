@@ -1,0 +1,20 @@
+[
+  {
+    "id": "counting",
+    "title": "Counting experiment",
+    "note": "One bin, a signal and a background with two systematic uncertainties",
+    "file": "counting.json"
+  },
+  {
+    "id": "search",
+    "title": "Search with control regions",
+    "note": "Three regions, six samples, 27 parameters of every kind",
+    "file": "search.json"
+  },
+  {
+    "id": "large",
+    "title": "Large synthetic model",
+    "note": "Ten regions, 116 bins, 319 parameters",
+    "file": "../../../tests/reference/workspaces/large.json"
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "name": "@histopresto/app",
+  "version": "0.1.0",
+  "author": "Alexander Held",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexander-held/histopresto.git",
+    "directory": "js/app"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node build.mjs --serve"
+  },
+  "dependencies": {
+    "@histopresto/core": "0.1.0",
+    "@histopresto/viz": "0.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -1,0 +1,71 @@
+{
+ "channels": [
+  {
+   "name": "signal_region",
+   "samples": [
+    {
+     "name": "signal",
+     "data": [
+      12
+     ],
+     "modifiers": [
+      {
+       "name": "mu",
+       "type": "normfactor",
+       "data": null
+      },
+      {
+       "name": "signal_acceptance",
+       "type": "normsys",
+       "data": {
+        "hi": 1.1,
+        "lo": 0.9
+       }
+      }
+     ]
+    },
+    {
+     "name": "background",
+     "data": [
+      50
+     ],
+     "modifiers": [
+      {
+       "name": "background_normalisation",
+       "type": "normsys",
+       "data": {
+        "hi": 1.12,
+        "lo": 0.88
+       }
+      },
+      {
+       "name": "mc_stat",
+       "type": "staterror",
+       "data": [
+        2.5
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "observations": [
+  {
+   "name": "signal_region",
+   "data": [
+    57
+   ]
+  }
+ ],
+ "measurements": [
+  {
+   "name": "meas",
+   "config": {
+    "poi": "mu",
+    "parameters": []
+   }
+  }
+ ],
+ "version": "1.0.0"
+}
