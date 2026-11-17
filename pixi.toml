@@ -16,7 +16,7 @@ pytest = "*"
 
 [pypi-dependencies]
 histopresto = { path = "python", editable = true }
-pyhf = ">=0.7.6, <0.8"
+pyhf = ">=0.8, <0.9"
 iminuit = ">=2.33.0, <3"
 
 [tasks]
@@ -28,3 +28,22 @@ build-app = { cmd = "npm run build", depends-on = ["npm-install"] }
 serve = { cmd = "npm run serve --workspace js/app", depends-on = ["npm-install"] }
 reference = "python tests/reference/export_reference.py"
 logo = "python scripts/make_logo.py -o assets/logo.svg && python scripts/make_logo.py --dark -o assets/logo-dark.svg && python scripts/make_logo.py --mark-only -o assets/icon.svg && python scripts/make_logo.py --mark-only --dark -o assets/icon-dark.svg"
+
+# pyhf with the purefunc modifier of https://github.com/scikit-hep/pyhf/pull/2717 (needs jax and sympy),
+# only used to export reference numbers for workspaces with expressions
+[feature.purefunc-ref.dependencies]
+python = "3.12.*"
+numpy = "*"
+scipy = "*"
+
+[feature.purefunc-ref.pypi-dependencies]
+pyhf = { git = "https://github.com/specktakel/pyhf", rev = "4445deda7c884cc3bb6adfa9286168afb2e5acf8" }
+jax = "*"
+sympy = ">=1.11"
+iminuit = ">=2.33.0, <3"
+
+[feature.purefunc-ref.tasks]
+reference-purefunc = "python tests/reference/export_reference.py purefunc purefunc_mixed purefunc_functions"
+
+[environments]
+purefunc-ref = { features = ["purefunc-ref"], no-default-feature = true }

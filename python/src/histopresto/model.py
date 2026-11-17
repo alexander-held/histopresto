@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from . import _kernel
+from .expression import compile_bindings, parse_bindings
 from .workspace import MODIFIER_TYPES
 
 _lib = _kernel.lib
@@ -77,6 +78,9 @@ class Model:
         self.samples = sorted(sample_set)
         modifiers = [modifier_keys[k] for k in sorted(modifier_keys)]
 
+        # expressions of purefunc modifiers; their symbols are parameters
+        trees, symbols = parse_bindings(ws.get("bindings", []), [name for name, type_ in modifiers if type_ == "purefunc"])
+
         self.channels = []
         offset = 0
         for name in sorted(channel_specs):
@@ -132,6 +136,10 @@ class Model:
                             "sigmas": [1 if s == 0 else s for s in sigmas],
                         }
                     )
+                continue
+            if type_ == "purefunc":
+                for name in symbols:
+                    requirements.setdefault(name, []).append(_scalar("free", 1, [0, 10]))
                 continue
             seen = set()
             for ci in range(len(self.channels)):
@@ -219,7 +227,10 @@ class Model:
             self.sets.append(s)
             set_by_name[name] = s
         for name, type_ in modifiers:
-            set_by_name[name]["types"].append(type_)
+            if type_ != "purefunc":
+                set_by_name[name]["types"].append(type_)
+        for name in symbols:
+            set_by_name[name]["types"].append("purefunc")
         self.n_pars = n_pars
 
         # flat per-parameter arrays
@@ -292,7 +303,8 @@ class Model:
             stat_index[name] = index
         t = {k: [] for k in ("blk_offset", "blk_n", "blk_cell", "nominal", "scal_start", "scal_count", "scal_par", "ns_start", "ns_count", "ns_par",
                              "ns_lnhi", "ns_lnlo", "ns_coef", "hs_start", "hs_count", "hs_par", "hs_data", "hs_up", "hs_dn", "gam_start", "gam_count",
-                             "gam_off", "gam_idx")}  # fmt: skip
+                             "gam_off", "gam_idx", "fn_start", "fn_count", "fn_slot")}  # fmt: skip
+        t["tape_op"], t["tape_a"], t["tape_b"], t["tape_value"], slots = compile_bindings(trees, lambda name: set_by_name[name]["start"])
         self.blocks = []
         self.channel_blocks = [[] for _ in self.channels]
         cell = 0
@@ -306,9 +318,13 @@ class Model:
                 for kind in ("scal", "ns", "hs", "gam"):
                     t[f"{kind}_start"].append(len(t["gam_off" if kind == "gam" else f"{kind}_par"]))
                 scal = []
+                t["fn_start"].append(len(t["fn_slot"]))
                 for name, type_ in modifiers:
                     mod = d[1].get(f"{type_}/{name}")
                     if not mod:
+                        continue
+                    if type_ == "purefunc":
+                        t["fn_slot"].append(slots[name])
                         continue
                     start = set_by_name[name]["start"]
                     if type_ in ("normfactor", "lumi"):
@@ -331,6 +347,7 @@ class Model:
                         else:
                             t["gam_idx"].extend(range(start, start + n))
                 t["scal_par"].extend(scal)
+                t["fn_count"].append(len(t["fn_slot"]) - t["fn_start"][-1])
                 for kind in ("scal", "ns", "hs", "gam"):
                     t[f"{kind}_count"].append(len(t["gam_off" if kind == "gam" else f"{kind}_par"]) - t[f"{kind}_start"][-1])
                 t["blk_offset"].append(ch.offset)
@@ -350,10 +367,12 @@ class Model:
             nu=np.zeros(B), cell_nu=np.zeros(cell), cell_base=np.zeros(cell), cell_gamma=np.zeros(cell),
             block_factor=np.zeros(len(self.blocks)), cell_weight=np.zeros(cell),
             ns_val=np.zeros(len(t["ns_par"])), ns_der=np.zeros(len(t["ns_par"])),
+            slot_val=np.zeros(len(t["tape_op"])), slot_adj=np.zeros(len(t["tape_op"])),
         )  # fmt: skip
         self._arrays = {name: np.ascontiguousarray(t[name], dtype=dtype) for name, dtype in _kernel.ARRAYS}
         self._struct = _kernel.HFModel(
             n_bins=B, n_pars=n_pars, n_blocks=len(self.blocks), n_cells=cell, n_gauss=len(gauss_idx), n_pois=len(pois_idx),
+            n_slots=len(t["tape_op"]),
             **{name: a.ctypes.data for name, a in self._arrays.items()},
         )  # fmt: skip
         self._ref = _kernel.ctypes.addressof(self._struct)

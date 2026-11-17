@@ -150,8 +150,8 @@ test("agreement with pyhf", async () => {
     const fit = await HF.infer.fit(frozen, frozen.likelihood(frozen.observed));
     close("fixed POI by measurement: -2lnL", fit.twiceNll, ref.fixed_poi.find((r) => r.mu === 2).twice_nll, 0, 1e-3);
     close("fixed POI by measurement: value", fit.pars[frozen.poiIndex], 2, 0);
-    const refused = (label, change) => {
-      const copy = JSON.parse(JSON.stringify(raw));
+    const refused = (label, change, base = raw) => {
+      const copy = JSON.parse(JSON.stringify(base));
       change(copy);
       try {
         new HF.Model(HF.parseWorkspace(copy), 0);
@@ -167,9 +167,20 @@ test("agreement with pyhf", async () => {
     refused("normfactor and normsys with one name", (w) => w.channels[0].samples[1].modifiers.push({ name: "mu", type: "normsys", data: { hi: 1.1, lo: 0.9 } }));
     refused("lumi without configuration", (w) => (w.measurements[0].config.parameters = []));
     refused("unknown POI", (w) => (w.measurements[0].config.poi = "nothing"));
+    // expressions
+    const pure = JSON.parse(fs.readFileSync(path.join(REF, "workspaces", "purefunc.json"), "utf8"));
+    refused("unknown expression language", (w) => (w.bindings[0].language = "python"), pure);
+    refused("more names than expressions", (w) => w.bindings[1].names.push("other"), pure);
+    refused("circular bindings", (w) => (w.bindings[0].expression = "(kappa + func3, alpha)"), pure);
+    refused("purefunc without binding", (w) => w.bindings.pop(), pure);
+    refused("unsupported function", (w) => (w.bindings[1].expression = "gamma(theta)"), pure);
+    refused("expression with a syntax error", (w) => (w.bindings[1].expression = "func1 + * theta"), pure);
+    // a binding that no modifier uses adds no parameters
+    pure.bindings.push({ names: ["unused"], expression: "2 * spare + func1", language: "sympy" });
+    same("unused binding: parameter names", new HF.Model(HF.parseWorkspace(pure), 0).names, reference.purefunc.par_names);
   }
   console.log(`${passed} checks passed, ${failures.length} failed`);
   for (const f of failures.slice(0, 40)) console.log("  FAIL " + f);
   assert.equal(failures.length, 0);
-  assert.equal(passed, 6819);
+  assert.equal(passed, 7370);
 });

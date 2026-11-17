@@ -25,8 +25,11 @@ ARRAYS = [
     ("pois_idx", "i4"), ("pois_aux", "i4"), ("pois_tau", "f8"),
     ("nu", "f8"), ("cell_nu", "f8"), ("cell_base", "f8"), ("cell_gamma", "f8"),
     ("block_factor", "f8"), ("cell_weight", "f8"), ("ns_val", "f8"), ("ns_der", "f8"),
+    ("fn_start", "i4"), ("fn_count", "i4"), ("fn_slot", "i4"),
+    ("tape_op", "i4"), ("tape_a", "i4"), ("tape_b", "i4"), ("tape_value", "f8"),
+    ("slot_val", "f8"), ("slot_adj", "f8"),
 ]
-COUNTS = ["n_bins", "n_pars", "n_blocks", "n_cells", "n_gauss", "n_pois"]
+COUNTS = ["n_bins", "n_pars", "n_blocks", "n_cells", "n_gauss", "n_pois", "n_slots"]
 
 
 class HFModel(ctypes.Structure):

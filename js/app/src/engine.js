@@ -34,7 +34,7 @@ J.load = async function (s, args) {
     poiBounds: model.poiIndex >= 0 ? [model.lower[model.poiIndex], model.upper[model.poiIndex]] : null,
     modifierCounts,
     // samples scaled by the POI, to draw them as signal
-    signalSamples: [...new Set(model.blocks.filter((b) => b.scal.includes(model.poiIndex)).map((b) => model.samples[b.sample]))],
+    signalSamples: [...new Set(model.blocks.filter((b) => b.scal.includes(model.poiIndex) || b.fnPars.includes(model.poiIndex)).map((b) => model.samples[b.sample]))],
     params: model.names.map((name, p) => {
       const set = model.sets[model.setIndex[p]];
       return {

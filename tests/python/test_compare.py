@@ -163,9 +163,9 @@ def test_agreement_with_pyhf():
     close("fixed POI by measurement: -2lnL", fit.twice_nll, next(r for r in ref["fixed_poi"] if r["mu"] == 2)["twice_nll"], 0, 1e-3)
     close("fixed POI by measurement: value", fit.pars[frozen.poi_index], 2, 0)
 
-    def refused(label, change):
+    def refused(label, change, base=raw):
         nonlocal passed
-        w = copy.deepcopy(raw)
+        w = copy.deepcopy(base)
         change(w)
         try:
             histopresto.Model(histopresto.parse_workspace(w), 0)
@@ -190,6 +190,22 @@ def test_agreement_with_pyhf():
     refused("lumi without configuration", clear_parameters)
     refused("unknown POI", set_poi)
 
+    # expressions
+    pure = json.loads((REF / "workspaces" / "purefunc.json").read_text())
+
+    def set_binding(index, key, value):
+        return lambda w: w["bindings"][index].update({key: value})
+
+    refused("unknown expression language", set_binding(0, "language", "python"), pure)
+    refused("more names than expressions", lambda w: w["bindings"][1]["names"].append("other"), pure)
+    refused("circular bindings", set_binding(0, "expression", "(kappa + func3, alpha)"), pure)
+    refused("purefunc without binding", lambda w: w["bindings"].pop(), pure)
+    refused("unsupported function", set_binding(1, "expression", "gamma(theta)"), pure)
+    refused("expression with a syntax error", set_binding(1, "expression", "func1 + * theta"), pure)
+    # a binding that no modifier uses adds no parameters
+    pure["bindings"].append({"names": ["unused"], "expression": "2 * spare + func1", "language": "sympy"})
+    same("unused binding: parameter names", histopresto.Model(histopresto.parse_workspace(pure), 0).names, reference["purefunc"]["par_names"])
+
     print(f"{passed} checks passed, {len(failures)} failed")
     assert not failures, "\n".join(failures[:40])
-    assert passed == 6819
+    assert passed == 7370

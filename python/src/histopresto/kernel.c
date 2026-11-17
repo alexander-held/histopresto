@@ -1,6 +1,6 @@
 // Numerical kernel of the HistFactory fitter: expected yields, -2 ln L with its gradient,
 // quasi-Newton minimisation with box bounds and second derivatives from gradient differences.
-// The loops follow fitter/js/model.js and fitter/js/minimize.js statement by statement.
+// The loops follow js/core/src/model.js, expression.js and minimize.js statement by statement.
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,7 +8,7 @@
 
 // Layout must match the ctypes Structure in _kernel.py. All memory is owned by the caller.
 typedef struct {
-  int32_t n_bins, n_pars, n_blocks, n_cells, n_gauss, n_pois;
+  int32_t n_bins, n_pars, n_blocks, n_cells, n_gauss, n_pois, n_slots;
   // one block per defined (channel, sample)
   const int32_t *blk_offset, *blk_n, *blk_cell;
   const double *nominal;                    // per cell
@@ -30,6 +30,12 @@ typedef struct {
   const double *pois_tau;
   // scratch space filled by hf_evaluate
   double *nu, *cell_nu, *cell_base, *cell_gamma, *block_factor, *cell_weight, *ns_val, *ns_der;
+  // purefunc modifiers: a tape of operations (see expression.py) and the slots that multiply each block
+  const int32_t *fn_start, *fn_count;       // per block, into fn_slot
+  const int32_t *fn_slot;
+  const int32_t *tape_op, *tape_a, *tape_b; // per slot
+  const double *tape_value;                 // per slot, used by constants
+  double *slot_val, *slot_adj;              // scratch space
 } hf_model;
 
 static const double LN2PI = 1.8378770664093453;
@@ -39,13 +45,90 @@ static inline double jmin(double a, double b) { return (isnan(a) || isnan(b)) ? 
 static inline double jmax(double a, double b) { return (isnan(a) || isnan(b)) ? NAN : (a > b ? a : b); }
 static inline double clamp(double v, double lo, double hi) { return jmin(jmax(v, lo), hi); }
 
+enum { OP_CONST, OP_PAR, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_POW, OP_NEG, OP_SQRT, OP_EXP, OP_LOG, OP_SIN, OP_COS, OP_TAN, OP_TANH, OP_ABS,
+       OP_ASIN, OP_ACOS, OP_ATAN, OP_SINH, OP_COSH };
+
+// values of all slots of the tape for the given parameters
+static void run_tape(const hf_model *m, const double *pars) {
+  const int32_t *op = m->tape_op, *a = m->tape_a, *b = m->tape_b;
+  double *val = m->slot_val;
+  for (int i = 0; i < m->n_slots; i++) {
+    switch (op[i]) {
+      case OP_CONST: val[i] = m->tape_value[i]; break;
+      case OP_PAR: val[i] = pars[a[i]]; break;
+      case OP_ADD: val[i] = val[a[i]] + val[b[i]]; break;
+      case OP_SUB: val[i] = val[a[i]] - val[b[i]]; break;
+      case OP_MUL: val[i] = val[a[i]] * val[b[i]]; break;
+      case OP_DIV: val[i] = val[a[i]] / val[b[i]]; break;
+      case OP_POW: val[i] = pow(val[a[i]], val[b[i]]); break;
+      case OP_NEG: val[i] = -val[a[i]]; break;
+      case OP_SQRT: val[i] = sqrt(val[a[i]]); break;
+      case OP_EXP: val[i] = exp(val[a[i]]); break;
+      case OP_LOG: val[i] = log(val[a[i]]); break;
+      case OP_SIN: val[i] = sin(val[a[i]]); break;
+      case OP_COS: val[i] = cos(val[a[i]]); break;
+      case OP_TAN: val[i] = tan(val[a[i]]); break;
+      case OP_TANH: val[i] = tanh(val[a[i]]); break;
+      case OP_ABS: val[i] = fabs(val[a[i]]); break;
+      case OP_ASIN: val[i] = asin(val[a[i]]); break;
+      case OP_ACOS: val[i] = acos(val[a[i]]); break;
+      case OP_ATAN: val[i] = atan(val[a[i]]); break;
+      case OP_SINH: val[i] = sinh(val[a[i]]); break;
+      default: val[i] = cosh(val[a[i]]);
+    }
+  }
+}
+
+// reverse sweep: slot_adj holds the derivative of some quantity with respect to slots; its derivative
+// with respect to the parameters is added to grad
+static void back_tape(const hf_model *m, double *grad) {
+  const int32_t *op = m->tape_op, *a = m->tape_a, *b = m->tape_b;
+  const double *val = m->slot_val;
+  double *adj = m->slot_adj;
+  for (int i = m->n_slots - 1; i >= 0; i--) {
+    const double g = adj[i];
+    if (g == 0) continue;
+    const double v = val[i];
+    switch (op[i]) {
+      case OP_CONST: break;
+      case OP_PAR: grad[a[i]] += g; break;
+      case OP_ADD: adj[a[i]] += g; adj[b[i]] += g; break;
+      case OP_SUB: adj[a[i]] += g; adj[b[i]] -= g; break;
+      case OP_MUL: { const double x = val[a[i]], y = val[b[i]]; adj[a[i]] += g * y; adj[b[i]] += g * x; break; }
+      case OP_DIV: { const double y = val[b[i]]; adj[a[i]] += g / y; adj[b[i]] -= (g * v) / y; break; }
+      case OP_POW: {
+        const double x = val[a[i]], y = val[b[i]];
+        adj[a[i]] += g * y * pow(x, y - 1);
+        if (op[b[i]] != OP_CONST) adj[b[i]] += g * v * log(x);
+        break;
+      }
+      case OP_NEG: adj[a[i]] -= g; break;
+      case OP_SQRT: adj[a[i]] += g / (2 * v); break;
+      case OP_EXP: adj[a[i]] += g * v; break;
+      case OP_LOG: adj[a[i]] += g / val[a[i]]; break;
+      case OP_SIN: adj[a[i]] += g * cos(val[a[i]]); break;
+      case OP_COS: adj[a[i]] -= g * sin(val[a[i]]); break;
+      case OP_TAN: adj[a[i]] += g * (1 + v * v); break;
+      case OP_TANH: adj[a[i]] += g * (1 - v * v); break;
+      case OP_ABS: adj[a[i]] += val[a[i]] < 0 ? -g : g; break;
+      case OP_ASIN: { const double x = val[a[i]]; adj[a[i]] += g / sqrt(1 - x * x); break; }
+      case OP_ACOS: { const double x = val[a[i]]; adj[a[i]] -= g / sqrt(1 - x * x); break; }
+      case OP_ATAN: { const double x = val[a[i]]; adj[a[i]] += g / (1 + x * x); break; }
+      case OP_SINH: adj[a[i]] += g * cosh(val[a[i]]); break;
+      default: adj[a[i]] += g * sinh(val[a[i]]);
+    }
+  }
+}
+
 // expected events for the given parameters; results are left in m->nu and m->cell_nu
 void hf_evaluate(hf_model *m, const double *pars) {
   double *nu = m->nu;
   memset(nu, 0, sizeof(double) * (size_t)m->n_bins);
+  run_tape(m, pars);
   for (int i = 0; i < m->n_blocks; i++) {
     double F = 1;
     for (int k = m->scal_start[i], e = k + m->scal_count[i]; k < e; k++) F *= pars[m->scal_par[k]];
+    for (int k = m->fn_start[i], e = k + m->fn_count[i]; k < e; k++) F *= m->slot_val[m->fn_slot[k]];
     for (int k = m->ns_start[i], e = k + m->ns_count[i]; k < e; k++) {
       const double a = pars[m->ns_par[k]];
       double v, d;
@@ -102,6 +185,9 @@ void hf_evaluate(hf_model *m, const double *pars) {
 // listed blocks (all if blocks is NULL); hf_evaluate must have been called with the same parameters
 void hf_accumulate(hf_model *m, const double *pars, double *grad, const int32_t *blocks, int n_list) {
   const double *cell_nu = m->cell_nu, *cell_base = m->cell_base, *cell_gamma = m->cell_gamma, *w = m->cell_weight;
+  const double *slot_val = m->slot_val;
+  double *slot_adj = m->slot_adj;
+  memset(slot_adj, 0, sizeof(double) * (size_t)m->n_slots);
   const int count = blocks ? n_list : m->n_blocks;
   for (int q = 0; q < count; q++) {
     const int i = blocks ? blocks[q] : q;
@@ -120,14 +206,27 @@ void hf_accumulate(hf_model *m, const double *pars, double *grad, const int32_t 
     if (!any) continue;
     const int s0 = m->scal_start[i], s1 = s0 + m->scal_count[i];
     const int n0 = m->ns_start[i], n1 = n0 + m->ns_count[i];
+    const int f0 = m->fn_start[i], f1 = f0 + m->fn_count[i];
     for (int k = s0; k < s1; k++) {
       const int p = m->scal_par[k];
       if (pars[p] != 0) grad[p] += T / pars[p];
       else {
         double rest = 1;
         for (int j = s0; j < s1; j++) if (j != k) rest *= pars[m->scal_par[j]];
+        for (int j = f0; j < f1; j++) rest *= slot_val[m->fn_slot[j]];
         for (int j = n0; j < n1; j++) rest *= m->ns_val[j];
         grad[p] += U * rest;
+      }
+    }
+    for (int k = f0; k < f1; k++) {
+      const int s = m->fn_slot[k];
+      if (slot_val[s] != 0) slot_adj[s] += T / slot_val[s];
+      else {
+        double rest = 1;
+        for (int j = s0; j < s1; j++) rest *= pars[m->scal_par[j]];
+        for (int j = f0; j < f1; j++) if (j != k) rest *= slot_val[m->fn_slot[j]];
+        for (int j = n0; j < n1; j++) rest *= m->ns_val[j];
+        slot_adj[s] += U * rest;
       }
     }
     for (int k = n0; k < n1; k++) grad[m->ns_par[k]] += (T * m->ns_der[k]) / m->ns_val[k];
@@ -165,6 +264,7 @@ void hf_accumulate(hf_model *m, const double *pars, double *grad, const int32_t 
       }
     }
   }
+  back_tape(m, grad);
 }
 
 // parameter-independent part of -2 ln L for a data vector (main data followed by auxiliary data)
@@ -298,6 +398,20 @@ int hf_minimize(hf_model *m, const double *data, double constant, const double *
   int converged = 0, resets = 0, stalled = 0, iter = 0;
   if (isfinite(f)) {
     for (; iter < max_iter && n > 0; iter++) {
+      // an infinite gradient pointing into the allowed range (the square root of a parameter at zero, say)
+      // gives no usable direction: step off the bound
+      int moved = 0;
+      for (int i = 0; i < n; i++) {
+        const int p = free_idx[i];
+        if (x[p] <= lower[p] && g[p] == -INFINITY) x[p] = lower[p] + 1e-6 * (upper[p] - lower[p]);
+        else if (x[p] >= upper[p] && g[p] == INFINITY) x[p] = upper[p] - 1e-6 * (upper[p] - lower[p]);
+        else continue;
+        moved = 1;
+      }
+      if (moved) {
+        f = hf_nll(m, data, constant, x, g);
+        if (!isfinite(f)) break;
+      }
       // parameters at a bound with the gradient pushing outwards do not move
       int k = 0;
       for (int i = 0; i < n; i++) {

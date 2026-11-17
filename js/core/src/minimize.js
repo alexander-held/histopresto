@@ -42,6 +42,20 @@ function minimize(fg, x0, lower, upper, free, options = {}) {
   if (!Number.isFinite(f)) return { x, f, g, C, edm, converged: false, iterations: 0, active };
 
   for (; iter < maxIter && n > 0; iter++) {
+    // an infinite gradient pointing into the allowed range (the square root of a parameter at zero, say)
+    // gives no usable direction: step off the bound
+    let moved = false;
+    for (let i = 0; i < n; i++) {
+      const p = free[i];
+      if (x[p] <= lower[p] && g[p] === -Infinity) x[p] = lower[p] + 1e-6 * (upper[p] - lower[p]);
+      else if (x[p] >= upper[p] && g[p] === Infinity) x[p] = upper[p] - 1e-6 * (upper[p] - lower[p]);
+      else continue;
+      moved = true;
+    }
+    if (moved) {
+      f = fg(x, g);
+      if (!Number.isFinite(f)) break;
+    }
     // parameters at a bound with the gradient pushing outwards do not move
     const act = [];
     for (let i = 0; i < n; i++) {

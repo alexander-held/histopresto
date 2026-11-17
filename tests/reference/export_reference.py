@@ -1,7 +1,10 @@
-"""Reference numbers from pyhf for the JavaScript fitter.
+"""Reference numbers from pyhf.
 
-Writes the test workspaces to test/fitter/workspaces/ and the numbers to test/fitter/reference.json.
-Run with: pixi run python test/fitter/export_reference.py [workspace names]
+Writes the test workspaces to tests/reference/workspaces/ and the numbers to tests/reference/reference.json.
+Run with: pixi run reference [workspace names]
+
+Workspaces with expressions (purefunc modifiers and bindings) need pyhf with
+https://github.com/scikit-hep/pyhf/pull/2717 and its jax backend: pixi run -e purefunc-ref reference-purefunc
 """
 
 import json
@@ -139,6 +142,130 @@ def ws_everything():
     )
 
 
+def ws_purefunc():
+    """purefunc modifiers only: a tuple binding, a binding that refers to another one, a sample with two functions"""
+    spec = workspace(
+        [
+            {
+                "name": "channel1",
+                "samples": [
+                    {"name": "a", "data": [12.0, 4.0], "modifiers": [{"name": "func1", "type": "purefunc"}]},
+                    {"name": "b", "data": [3.0, 14.0], "modifiers": [{"name": "func2", "type": "purefunc"}]},
+                ],
+            },
+            {
+                "name": "channel2",
+                "samples": [
+                    {"name": "b", "data": [20.0, 10.0, 5.0], "modifiers": [{"name": "func2", "type": "purefunc"}]},
+                    {"name": "c", "data": [8.0, 8.0, 8.0], "modifiers": [{"name": "func3", "type": "purefunc"}]},
+                    {"name": "d", "data": [1.0, 2.0, 4.0], "modifiers": [{"name": "func1", "type": "purefunc"}, {"name": "func4", "type": "purefunc"}]},
+                ],
+            },
+        ],
+        {"channel1": [33.0, 46.0], "channel2": [86.0, 57.0, 55.0]},
+        poi="alpha",
+        parameters=[
+            {"name": "kappa", "inits": [1.5], "bounds": [[0.0, 10.0]]},
+            {"name": "alpha", "inits": [2.0], "bounds": [[0.0, 6.0]]},
+        ],
+    )
+    spec["bindings"] = [
+        {"names": ["func1", "func2"], "expression": "(kappa ** 2, (kappa ** 2 + alpha))", "language": "sympy"},
+        {"names": ["func3"], "expression": "func1 + sqrt(theta)", "language": "sympy"},
+        {"names": ["func4"], "expression": "exp(-theta / 4) * (1.5 + cos(pi * alpha / 6))", "language": "sympy"},
+    ]
+    return spec
+
+
+def ws_purefunc_functions():
+    """every function and operator of the expressions, each on its own sample"""
+    expressions = [
+        "asin(x) + acos(x) / pi",
+        "atan(y) * sinh(x) + cosh(y) / E",
+        "tan(x) + tanh(y) + log(1 + y) + ln(2)",
+        "Abs(x - y) + 2 ** x + y ** -0.5 - -x ** 2 + 1",
+        "(sqrt(x * y) - exp(-y)) / (sin(x) + cos(y) ** 2) + 3.5e-1 * y ** 1.5",
+    ]
+    samples = [
+        {"name": f"s{k}", "data": [10.0 + 3 * k, 25.0 - 4 * k, 8.0 + k * k], "modifiers": [{"name": f"f{k}", "type": "purefunc"}]}
+        for k in range(len(expressions))
+    ]
+    spec = workspace(
+        [{"name": "SR", "samples": samples}],
+        {"SR": [130.0, 150.0, 140.0]},
+        poi="x",
+        parameters=[{"name": "x", "inits": [0.5], "bounds": [[0.2, 0.9]]}, {"name": "y", "inits": [1.5], "bounds": [[1.0, 3.0]]}],
+    )
+    spec["bindings"] = [{"names": [f"f{k}"], "expression": e, "language": "sympy"} for k, e in enumerate(expressions)]
+    return spec
+
+
+def ws_purefunc_mixed():
+    """purefunc modifiers next to the standard ones; the symbol mu is also a normfactor"""
+    spec = workspace(
+        [
+            {
+                "name": "SR",
+                "samples": [
+                    {
+                        "name": "signal",
+                        "data": [2.0, 12.0, 4.0],
+                        "modifiers": [
+                            mod("mu", "normfactor"),
+                            mod("acc", "normsys", {"hi": 1.08, "lo": 0.9}),
+                            mod("stat_SR", "staterror", [0.3, 0.5, 0.4]),
+                        ],
+                    },
+                    {
+                        "name": "interference",
+                        "data": [1.5, 2.0, 0.5],
+                        "modifiers": [{"name": "damped_mu", "type": "purefunc"}, mod("acc", "normsys", {"hi": 1.04, "lo": 0.95})],
+                    },
+                    {
+                        "name": "bkgA",
+                        "data": [30.0, 25.0, 12.0],
+                        "modifiers": [
+                            {"name": "norm_A", "type": "purefunc"},
+                            mod("jes", "histosys", {"hi_data": [32.0, 25.5, 11.0], "lo_data": [28.5, 24.0, 12.5]}),
+                            mod("stat_SR", "staterror", [1.5, 1.2, 0.9]),
+                        ],
+                    },
+                    {
+                        "name": "bkgB",
+                        "data": [30.0, 22.0, 12.0],
+                        "modifiers": [{"name": "norm_B", "type": "purefunc"}, mod("fakes", "shapesys", [2.0, 2.5, 3.0])],
+                    },
+                ],
+            },
+            {
+                "name": "CR",
+                "samples": [
+                    {
+                        "name": "bkgA",
+                        "data": [300.0, 250.0],
+                        "modifiers": [
+                            {"name": "norm_A", "type": "purefunc"},
+                            mod("jes", "histosys", {"hi_data": [315.0, 262.0], "lo_data": [288.0, 240.0]}),
+                        ],
+                    },
+                    {
+                        "name": "bkgB",
+                        "data": [60.0, 240.0],
+                        "modifiers": [{"name": "norm_B", "type": "purefunc"}, mod("gen", "normsys", {"hi": 1.1, "lo": 0.92})],
+                    },
+                ],
+            },
+        ],
+        {"SR": [66.0, 68.0, 27.0], "CR": [352.0, 505.0]},
+        parameters=[{"name": "mu", "bounds": [[0.0, 8.0]]}, {"name": "ratio", "inits": [1.2], "bounds": [[0.2, 4.0]]}],
+    )
+    spec["bindings"] = [
+        {"names": ["damped_mu"], "expression": "mu / (1 + 0.2 * mu)", "language": "sympy"},
+        {"names": ["norm_A", "norm_B"], "expression": "(k_A, k_A * ratio ** 1.5 / (1 + 0.1 * (ratio - 1)))", "language": "sympy"},
+    ]
+    return spec
+
+
 def ws_random(seed, n_channels, n_samples, n_bins, n_norm, n_shape, staterror=True):
     """workspace with many correlated systematics; data fluctuated around a shifted model"""
     rng = np.random.default_rng(seed)
@@ -212,7 +339,29 @@ WORKSPACES = {
     "everything": (ws_everything(), "full"),
     "medium": (ws_random(1, 3, 4, 6, 8, 6), "full"),
     "large": (ws_random(2, 10, 8, [12, 8, 15, 10, 6, 20, 9, 14, 10, 12], 120, 80), "fit"),
+    "purefunc": (ws_purefunc(), "full"),
+    "purefunc_mixed": (ws_purefunc_mixed(), "full"),
+    "purefunc_functions": (ws_purefunc_functions(), "fit"),
 }
+
+
+def build(spec):
+    """pyhf model and data of a workspace; returns also the name of the backend to use"""
+    ws = pyhf.Workspace(spec, validate=False)
+    if "bindings" not in spec:
+        model = ws.model(validate=False)
+        return model, np.asarray(ws.data(model)), "numpy"
+    from pyhf.contrib.extended_modifiers import purefunc  # only in pyhf with PR 2717
+
+    pyhf.set_backend("jax")
+    config = spec["measurements"][0]["config"]
+    model = pyhf.Model(
+        {"channels": spec["channels"], "parameters": config["parameters"], "bindings": spec["bindings"]},
+        poi_name=config["poi"],
+        modifier_set=purefunc.enable(),
+        validate=False,
+    )
+    return model, np.asarray(ws.data(model)), "jax"
 
 
 def random_points(model, rng, n):
@@ -236,9 +385,7 @@ def export(name, spec, level):
     print(f"{name}: ", end="", flush=True)
     t0 = time.time()
     (HERE / "workspaces" / f"{name}.json").write_text(json.dumps(spec))
-    ws = pyhf.Workspace(spec, validate=False)
-    model = ws.model(validate=False)
-    data = np.asarray(ws.data(model))
+    model, data, backend = build(spec)
     rng = np.random.default_rng(42)
     out = {
         "par_names": model.config.par_names,
@@ -256,8 +403,8 @@ def export(name, spec, level):
         out["points"].append(
             {
                 "pars": p,
-                "expected_data": np.asarray(model.expected_data(p)).tolist(),
-                "logpdf": float(model.logpdf(p, data)[0]),
+                "expected_data": np.asarray(model.expected_data(pyhf.tensorlib.astensor(p))).tolist(),
+                "logpdf": float(model.logpdf(pyhf.tensorlib.astensor(p), data)[0]),
             }
         )
 
@@ -270,12 +417,12 @@ def export(name, spec, level):
     if level != "full":
         # many parameters: Minuit with numerical gradients does not finish within millions of calls,
         # so only the minimum found by scipy is recorded (a looser reference than Minuit's)
-        pyhf.set_backend("numpy", pyhf.optimize.scipy_optimizer(maxiter=200_000))
+        pyhf.set_backend(backend, pyhf.optimize.scipy_optimizer(maxiter=200_000))
         _, twice_nll = pyhf.infer.mle.fit(data, model, return_fitted_val=True)
         out["scipy_twice_nll"] = float(twice_nll)
         print(f"scipy fit {time.time() - t0:.1f}s")
         return out
-    pyhf.set_backend("numpy", pyhf.optimize.minuit_optimizer(tolerance=1e-3, strategy=2))
+    pyhf.set_backend(backend, pyhf.optimize.minuit_optimizer(tolerance=1e-3, strategy=2))
     result, twice_nll, opt = pyhf.infer.mle.fit(
         data, model, return_uncertainties=True, return_fitted_val=True, return_result_obj=True
     )
@@ -288,7 +435,7 @@ def export(name, spec, level):
     if level == "full":
         # Minuit's uncertainties are distorted for parameters with a range comparable to their uncertainty,
         # so the reference covariance is the inverse of the numerical second derivatives of pyhf's likelihood
-        best = result[:, 0]
+        best = np.array(result[:, 0])
         # parameters that Minuit leaves next to a bound are treated as sitting on it
         def inside(i):
             margin = 1e-3 * (bounds[i][1] - bounds[i][0])
@@ -301,7 +448,7 @@ def export(name, spec, level):
             x = best.copy()
             for i, d in shifts:
                 x[i] += d
-            return -2 * float(model.logpdf(x, data)[0])
+            return -2 * float(model.logpdf(pyhf.tensorlib.astensor(x), data)[0])
 
         f0 = nll([])
         k = len(free)
@@ -320,7 +467,7 @@ def export(name, spec, level):
     print(f"fit {time.time() - t0:.1f}s ", end="", flush=True)
 
     # conditional fits and hypothesis tests with a looser tolerance (strict settings can fail on Asimov data)
-    pyhf.set_backend("numpy", pyhf.optimize.minuit_optimizer(tolerance=1e-2))
+    pyhf.set_backend(backend, pyhf.optimize.minuit_optimizer(tolerance=1e-2))
     out["fixed_poi"] = []
     for mu in [0.0, 0.5, 2.0]:
         _, nll = pyhf.infer.mle.fixed_poi_fit(mu, data, model, return_fitted_val=True)
@@ -348,7 +495,7 @@ def export(name, spec, level):
         wide = [list(b) for b in bounds]
         wide[poi] = [-5.0, bounds[poi][1]]
         out["hypotest_q"] = []
-        for mu in [1.0]:
+        for mu in [] if "bindings" in spec else [1.0]:  # expressions need not be defined for negative values
             try:
                 cls_obs, cls_exp = pyhf.infer.hypotest(
                     mu, data, model, par_bounds=wide, test_stat="q", return_expected_set=True
@@ -390,10 +537,10 @@ def export(name, spec, level):
 if __name__ == "__main__":
     import sys
 
-    # without arguments everything is exported; with names only those entries are replaced
+    # the named entries are replaced; without arguments, all that this pyhf can do (those without expressions)
     path = HERE / "reference.json"
-    reference = json.loads(path.read_text()) if path.exists() and sys.argv[1:] else {}
-    for name in sys.argv[1:] or WORKSPACES:
+    reference = json.loads(path.read_text()) if path.exists() else {}
+    for name in sys.argv[1:] or [name for name, (spec, _) in WORKSPACES.items() if "bindings" not in spec]:
         spec, level = WORKSPACES[name]
         reference[name] = export(name, spec, level)
         path.write_text(json.dumps(reference))
