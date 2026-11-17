@@ -258,31 +258,27 @@ LEVELS = {
 def scan(model, lik, base, index, values):
     """Profile likelihood scan of one parameter.
 
-    intervals: confidence intervals (cl, level, lo, hi) around the minimum, with the crossings refined
-    by further fits. An end is infinite if the curve stays below the level up to the end of the scan,
-    and nan if the scan has no point below the level.
+    intervals: for each confidence level (cl, level, ranges), where ranges lists the (from, to)
+    stretches of the scan below the level (more than one if the likelihood has several minima), with
+    the ends refined by further fits. An end is infinite if the curve is still below the level at the
+    end of the scan.
     """
     out = [conditional(model, lik, base, index, v).twice_nll - base.twice_nll for v in values]
     iv = interval(values, out, 1)
     # measured from the fit result, or from the lowest point of the scan should that lie below it
     ref = min(out[iv.index], 0.0)
+    last = len(values) - 1
 
-    def edge(level, step):
-        if not out[iv.index] - ref < level:
-            return math.nan
-        k = iv.index
-        while 0 <= k + step < len(values) and out[k + step] - ref < level:
-            k += step
-        if not 0 <= k + step < len(values):
-            return step * math.inf
+    def root(y):
+        return math.sqrt(max(y, 0.0))
+
+    def crossing(level, k, step):
+        """where the curve crosses the level between scan point k (below it) and its neighbour (above it)"""
         a = (values[k], out[k] - ref)
         b = (values[k + step], out[k + step] - ref)
         if not math.isfinite(b[1]):
             return b[0]
         # regula falsi on the square root, which is a straight line for a parabola
-        def root(y):
-            return math.sqrt(max(y, 0.0))
-
         x = b[0]
         for _ in range(8):
             x = a[0] + ((root(level) - root(a[1])) / (root(b[1]) - root(a[1]))) * (b[0] - a[0])
@@ -295,7 +291,19 @@ def scan(model, lik, base, index, values):
                 b = (x, y)
         return x
 
-    intervals = [SimpleNamespace(cl=lv.cl, level=lv.level, lo=edge(lv.level, -1), hi=edge(lv.level, 1)) for lv in LEVELS[1]]
+    intervals = []
+    for lv in LEVELS[1]:
+        below = [y - ref < lv.level for y in out]
+        ranges = []
+        k = 0
+        while k <= last:
+            if below[k]:
+                first = k
+                while k < last and below[k + 1]:
+                    k += 1
+                ranges.append((-math.inf if first == 0 else crossing(lv.level, first, -1), math.inf if k == last else crossing(lv.level, k, 1)))
+            k += 1
+        intervals.append(SimpleNamespace(cl=lv.cl, level=lv.level, ranges=ranges))
     return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=iv, reference=ref, intervals=intervals)
 
 

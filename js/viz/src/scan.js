@@ -5,7 +5,7 @@ import { num, percent } from "./format.js";
 
 const BANDS = ["var(--band-1)", "var(--band-2)"];
 
-// scan: {values, twiceDeltaNll, reference, intervals: [{cl, level, lo, hi}]}, intervals ordered by cl;
+// scan: {values, twiceDeltaNll, reference, intervals: [{cl, level, ranges: [[from, to], ...]}]}, intervals ordered by cl;
 // best, unc: fit result for the parameter (unc > 0 adds the parabola)
 function drawScan(container, scan, { name, best, unc }) {
   const x = scan.values;
@@ -18,8 +18,10 @@ function drawScan(container, scan, { name, best, unc }) {
   const a = fig.axes({ box: [0, 0, 760, 430], xlim, ylim: [0, top * 1.05], xlabel: name, ylabel: "−2 Δln L" });
   // each interval is shaded up to its level, the widest first
   const clip = (v) => Math.min(Math.max(v, xlim[0]), xlim[1]);
-  const shades = intervals.map((iv, k) => [iv, BANDS[k] || BANDS[1]]).filter(([iv]) => !Number.isNaN(iv.lo)).reverse();
-  for (const [iv, fill] of shades) a.rect(clip(iv.lo), ref, clip(iv.hi), ref + iv.level, { fill, label: `${percent(iv.cl)} CI` });
+  intervals
+    .map((iv, k) => [iv, BANDS[k] || BANDS[1]])
+    .reverse()
+    .forEach(([iv, fill]) => iv.ranges.forEach(([lo, hi], r) => a.rect(clip(lo), ref, clip(hi), ref + iv.level, { fill, label: r ? null : `${percent(iv.cl)} CI` })));
   for (const iv of intervals) a.hline(ref + iv.level, { color: "var(--grey)", dash: "2 4" });
   if (unc > 0) {
     const xs = Array.from({ length: 121 }, (_, i) => x[0] + ((x[x.length - 1] - x[0]) * i) / 120);

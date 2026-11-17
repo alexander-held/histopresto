@@ -81,18 +81,22 @@ function renderScan1d(container, state) {
   const centre = done.reference < -1e-3 ? done.interval.min : f.pars[index];
   const end = (v) => (Number.isFinite(v) ? num(v) : "?");
   const side = (v, sign) => (Number.isFinite(v) ? `${sign}${num(Math.abs(v - centre))}` : `${sign}?`);
-  const openEnded = done.intervals.some((iv) => !Number.isNaN(iv.lo) && !(Number.isFinite(iv.lo) && Number.isFinite(iv.hi)));
+  const openEnded = done.intervals.some((iv) => iv.ranges.some((r) => !r.every(Number.isFinite)));
+  const split = done.intervals.some((iv) => iv.ranges.length > 1);
+  // one row per range; the distances to the central value are given for the range that contains it
+  const rows = (iv) => {
+    const head = (k) => (k ? `<td></td><td></td>` : `<td>${percent(iv.cl)}</td><td class="num">${fmt(iv.level)}</td>`);
+    if (!iv.ranges.length) return `<tr>${head(0)}<td class="dim" colspan="3">no scan point inside</td></tr>`;
+    return iv.ranges
+      .map(([lo, hi], k) => `<tr>${head(k)}<td class="num"><b>${end(lo)}</b></td><td class="num"><b>${end(hi)}</b></td><td class="num">${lo <= centre && centre <= hi ? `${side(lo, "−")} / ${side(hi, "+")}` : ""}</td></tr>`)
+      .join("");
+  };
   container.querySelector("#scan-text").innerHTML =
     `<div class="results"><table class="data"><tr><th>confidence interval for ${esc(p.name)}</th><th class="num">−2 Δln <i>L</i></th><th class="num">from</th><th class="num">to</th><th class="num">around ${num(centre)}</th></tr>` +
-    done.intervals
-      .map((iv) =>
-        Number.isNaN(iv.lo)
-          ? `<tr><td>${percent(iv.cl)}</td><td class="num">${fmt(iv.level)}</td><td class="dim" colspan="3">no scan point inside</td></tr>`
-          : `<tr><td>${percent(iv.cl)}</td><td class="num">${fmt(iv.level)}</td><td class="num"><b>${end(iv.lo)}</b></td><td class="num"><b>${end(iv.hi)}</b></td><td class="num">${side(iv.lo, "−")} / ${side(iv.hi, "+")}</td></tr>`
-      )
-      .join("") +
+    done.intervals.map(rows).join("") +
     `</table></div>` +
     `<p class="note">The fit gave ${num(f.pars[index])}${f.unc[index] > 0 ? ` ± ${num(f.unc[index], 2)}` : ""}. The ends of the intervals are found with further fits between the scan points.` +
+    (split ? ` The likelihood has more than one minimum in the scanned range, so a confidence region can consist of several separate intervals; each is listed on its own row.` : "") +
     (openEnded ? ` A <b>?</b> marks an end outside the scanned range.` : "") +
     lowerPoint(-done.reference) +
     ` ${done.values.length} scan points in ${App.duration(done.seconds)}.</p>`;

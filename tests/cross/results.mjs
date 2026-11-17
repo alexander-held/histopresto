@@ -25,7 +25,7 @@ console.log(
     limit_tests: limit.results.length,
     z: [significance.z, significance.zExpected],
     scan: scan.twiceDeltaNll,
-    intervals: scan.intervals.flatMap((iv) => [iv.lo, iv.hi]).map((v) => (Number.isFinite(v) ? v : String(v))),
+    intervals: scan.intervals.flatMap((iv) => iv.ranges.flat()).map((v) => (Number.isFinite(v) ? v : String(v))),
     scan_unc: base.unc[p],
     scan2d: scan2d ? scan2d.twiceDeltaNll.flat() : [],
   })

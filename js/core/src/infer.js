@@ -189,9 +189,10 @@ const LEVELS = {
   2: [{ cl: 0.6827, level: 2.295748928898636 }, { cl: 0.95, level: 5.991464547107979 }],
 };
 
-// Profile likelihood scan of one parameter. intervals: confidence intervals {cl, level, lo, hi} around
-// the minimum, with the crossings refined by further fits. An end is infinite if the curve stays below
-// the level up to the end of the scan, and NaN if the scan has no point below the level.
+// Profile likelihood scan of one parameter. intervals: for each confidence level {cl, level, ranges},
+// where ranges lists the [from, to] stretches of the scan below the level (more than one if the
+// likelihood has several minima), with the ends refined by further fits. An end is infinite if the
+// curve is still below the level at the end of the scan.
 async function scan(model, lik, base, index, values, ctx = NO_CTX) {
   const out = [];
   for (let i = 0; i < values.length; i++) {
@@ -202,11 +203,9 @@ async function scan(model, lik, base, index, values, ctx = NO_CTX) {
   const iv = interval(values, out, 1);
   // measured from the fit result, or from the lowest point of the scan should that lie below it
   const ref = Math.min(out[iv.index], 0);
-  const edge = (level, dir) => {
-    if (!(out[iv.index] - ref < level)) return NaN;
-    let k = iv.index;
-    while (out[k + dir] - ref < level) k += dir;
-    if (k + dir < 0 || k + dir >= values.length) return dir * Infinity;
+  const last = values.length - 1;
+  // where the curve crosses the level between scan point k (below it) and its neighbour (above it)
+  const crossing = (level, k, dir) => {
     let a = [values[k], out[k] - ref];
     let b = [values[k + dir], out[k + dir] - ref];
     if (!Number.isFinite(b[1])) return b[0];
@@ -225,7 +224,15 @@ async function scan(model, lik, base, index, values, ctx = NO_CTX) {
   const intervals = [];
   for (const { cl, level } of LEVELS[1]) {
     await ctx.tick({ label: `scan of ${model.names[index]}: ${Number((100 * cl).toFixed(1))}% interval` });
-    intervals.push({ cl, level, lo: edge(level, -1), hi: edge(level, 1) });
+    const below = (k) => out[k] - ref < level;
+    const ranges = [];
+    for (let k = 0; k <= last; k++) {
+      if (!below(k)) continue;
+      const first = k;
+      while (k < last && below(k + 1)) k++;
+      ranges.push([first === 0 ? -Infinity : crossing(level, first, -1), k === last ? Infinity : crossing(level, k, 1)]);
+    }
+    intervals.push({ cl, level, ranges });
   }
   return { index, values, twiceDeltaNll: out, interval: iv, reference: ref, intervals };
 }
