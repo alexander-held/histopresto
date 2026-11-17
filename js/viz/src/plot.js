@@ -214,6 +214,15 @@ A.rect = function (xa, ya, xb, yb, s = {}) {
     { label: s.label, kind: "box", color: s.fill || "none", stroke: s.stroke, opacity: s.opacity }
   );
 };
+// polylines [[x, y], ...]; with fill they are closed and filled as one shape (holes by the even-odd rule)
+A.paths = function (lines, s = {}) {
+  const d = lines.map((l) => l.map((q, i) => `${i ? "L" : "M"}${r2(this.px(q[0]))} ${r2(this.py(q[1]))}`).join("") + (s.fill ? "Z" : "")).join("");
+  const width = s.width || 1.5;
+  return this._add(
+    `<path d="${d}" fill="${s.fill || "none"}" fill-rule="evenodd" stroke="${s.color || "none"}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"${dashOf(s.dash)}/>`,
+    s.fill ? { label: s.label, kind: "box", color: s.fill, stroke: s.color } : { label: s.label, kind: "line", color: s.color, width, dash: s.dash }
+  );
+};
 function markerSvg(kind, x, y, size, fill, stroke, strokeWidth) {
   const st = `fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"`;
   if (kind === "s") return `<rect x="${r2(x - size)}" y="${r2(y - size)}" width="${2 * size}" height="${2 * size}" ${st}/>`;
@@ -284,7 +293,7 @@ A.legend = function () {
 
 // marks are declared before the layout is known: declaring one only registers its legend entry,
 // the SVG is produced by calling the method again at render time
-for (const name of ["line", "segments", "steps", "band", "rect", "points", "hline", "vline", "hspan", "vspan", "text", "image"]) {
+for (const name of ["line", "segments", "steps", "band", "rect", "paths", "points", "hline", "vline", "hspan", "vspan", "text", "image"]) {
   const make = A[name];
   A[name] = function (...args) {
     make.apply(this, args);

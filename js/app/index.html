@@ -9,13 +9,13 @@
 </head>
 <body>
 <header>
-  <span class="title">
+  <a class="title" href="https://github.com/alexander-held/histopresto" title="histopresto on GitHub">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="icon-dark.svg">
       <img src="icon.svg" alt="" width="26" height="26">
     </picture>
     histopresto
-  </span>
+  </a>
   <span class="note">HistFactory fits that run entirely in this browser tab. Nothing is uploaded.</span>
 </header>
 <main>
@@ -48,6 +48,9 @@
       <label id="poi-label">range of <span id="poi-name" class="mono"></span>
         <input id="poi-lo" type="number" step="any" aria-label="lower bound of the parameter of interest"> to
         <input id="poi-hi" type="number" step="any" aria-label="upper bound of the parameter of interest">
+      </label>
+      <label title="Asimov data: the expectation of the model at its initial parameter values replaces the observed data">data
+        <select id="dataset"><option value="observed">observed</option><option value="asimov">Asimov</option></select>
       </label>
       <button id="fit" class="primary">Fit</button>
       <span id="status" class="status" role="status"></span>

@@ -7,5 +7,6 @@ export { pull, drawPulls } from "./pulls.js";
 export { drawCorrelations } from "./correlations.js";
 export { drawRanking } from "./ranking.js";
 export { drawYields } from "./yields.js";
-export { drawScan } from "./scan.js";
+export { drawScan, drawScan2d } from "./scan.js";
+export { contour, refine } from "./contour.js";
 export { drawLimit } from "./limits.js";

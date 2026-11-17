@@ -200,47 +200,105 @@ def cov_at(base, p, q):
 
 
 def conditional(model, lik, base, index, value):
-    """Fit with one parameter held at a value, starting from an earlier fit and its covariance."""
-    free = base.free[base.free != index]
+    """Fit with parameters held at given values (one index and value, or sequences of them), starting
+    from an earlier fit and its covariance."""
+    held = np.atleast_1d(np.asarray(index, dtype=np.int32))
+    values = np.atleast_1d(np.asarray(value, dtype=np.float64))
+    free = base.free[~np.isin(base.free, held)]
     n = len(free)
     cov = base.cov
-    a = base.pos[index] if cov is not None else -1
-    where = base.pos[free]
-    known = where >= 0
-    w = where[known]
-    C0 = base.cache.get(index)
-    if C0 is None:
-        C0 = np.zeros((n, n))
+    key = tuple(int(p) for p in held)
+    start = base.cache.get(key)
+    if start is None:
+        # held parameters with an entry in the covariance matrix, and the inverse of their block of it
+        known = [p for p in key if cov is not None and cov_at(base, p, p) > 0]
+        at = base.pos[np.array(known, dtype=np.int32)]
+        S_inv = _inverse(cov[np.ix_(at, at)]) if known else None
+        if S_inv is None:
+            known = []
+        where = base.pos[free]
+        inside = where >= 0 if cov is not None else np.zeros(n, dtype=bool)
+        w = where[inside]
         rows = np.arange(n)
-        if cov is None:
-            C0[rows, rows] = _diag_guess(model, free)
-        else:
+        # gain: shift of the free parameters per unit shift of the held ones; C: covariance of the free ones given the held ones
+        gain = np.zeros((n, len(known)))
+        C = np.zeros((n, n))
+        C[rows[~inside], rows[~inside]] = _diag_guess(model, free[~inside])
+        if cov is not None:
             sub = cov[np.ix_(w, w)]
-            if a >= 0 and cov[a, a] > 0:
-                sub = sub - np.outer(cov[w, a] / cov[a, a], cov[a, w])
-            C0[np.ix_(rows[known], rows[known])] = 0.5 * sub
-            C0[rows[~known], rows[~known]] = _diag_guess(model, free[~known])
-        base.cache[index] = C0
+            if known:
+                gain[inside] = cov[np.ix_(w, at)] @ S_inv
+                sub = sub - gain[inside] @ cov[np.ix_(at, w)]
+            C[np.ix_(rows[inside], rows[inside])] = 0.5 * sub
+        start = SimpleNamespace(C=C, gain=gain, known=known, inside=inside)
+        base.cache[key] = start
     # linear prediction of where the other parameters go
     x0 = base.pars.copy()
-    x0[index] = value
-    if a >= 0 and cov[a, a] > 0:
-        shift = (value - base.pars[index]) / cov[a, a]
-        p = free[known]
-        x0[p] = np.minimum(np.maximum(base.pars[p] + shift * cov[w, a], model.lower[p]), model.upper[p])
-    res = minimize(lik, x0, free, C=C0, tol=1e-8)
+    x0[held] = values
+    if start.known:
+        shift = np.array([values[key.index(p)] - base.pars[p] for p in start.known])
+        p = free[start.inside]
+        x0[p] = np.minimum(np.maximum(base.pars[p] + start.gain[start.inside] @ shift, model.lower[p]), model.upper[p])
+    res = minimize(lik, x0, free, C=start.C, tol=1e-8)
     if not math.isfinite(res.f):
         # the prediction left the region where the model is defined: start from the base fit instead
         x1 = base.pars.copy()
-        x1[index] = value
-        res = minimize(lik, x1, free, C=C0, tol=1e-8)
+        x1[held] = values
+        res = minimize(lik, x1, free, C=start.C, tol=1e-8)
     return SimpleNamespace(pars=res.x, twice_nll=res.f, converged=res.converged)
 
 
+# -2 Δln L at the edge of the 68.3% (one standard deviation) and 95% confidence regions, for one and for two parameters
+LEVELS = {
+    1: [SimpleNamespace(cl=0.6827, level=1.0), SimpleNamespace(cl=0.95, level=3.841458820694124)],
+    2: [SimpleNamespace(cl=0.6827, level=2.295748928898636), SimpleNamespace(cl=0.95, level=5.991464547107979)],
+}
+
+
 def scan(model, lik, base, index, values):
-    """Profile likelihood scan of one parameter."""
+    """Profile likelihood scan of one parameter.
+
+    intervals: confidence intervals (cl, level, lo, hi) around the minimum, with the crossings refined
+    by further fits. An end is infinite if the curve stays below the level up to the end of the scan,
+    and nan if the scan has no point below the level.
+    """
     out = [conditional(model, lik, base, index, v).twice_nll - base.twice_nll for v in values]
-    return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=interval(values, out, 1))
+    iv = interval(values, out, 1)
+    # measured from the fit result, or from the lowest point of the scan should that lie below it
+    ref = min(out[iv.index], 0.0)
+
+    def edge(level, step):
+        if not out[iv.index] - ref < level:
+            return math.nan
+        k = iv.index
+        while 0 <= k + step < len(values) and out[k + step] - ref < level:
+            k += step
+        if not 0 <= k + step < len(values):
+            return step * math.inf
+        a = (values[k], out[k] - ref)
+        b = (values[k + step], out[k + step] - ref)
+        if not math.isfinite(b[1]):
+            return b[0]
+        x = b[0]
+        for _ in range(8):
+            x = a[0] + ((level - a[1]) / (b[1] - a[1])) * (b[0] - a[0])
+            y = conditional(model, lik, base, index, x).twice_nll - base.twice_nll - ref
+            if not math.isfinite(y) or abs(y - level) < 1e-4:
+                break
+            if y < level:
+                a = (x, y)
+            else:
+                b = (x, y)
+        return x
+
+    intervals = [SimpleNamespace(cl=lv.cl, level=lv.level, lo=edge(lv.level, -1), hi=edge(lv.level, 1)) for lv in LEVELS[1]]
+    return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=iv, reference=ref, intervals=intervals)
+
+
+def scan2d(model, lik, base, indices, x, y):
+    """Profile likelihood scan of two parameters on a grid: twice_delta_nll[i][j] for x[i], y[j]."""
+    z = [[conditional(model, lik, base, indices, [u, v]).twice_nll - base.twice_nll for v in y] for u in x]
+    return SimpleNamespace(indices=indices, x=x, y=y, twice_delta_nll=z, levels=LEVELS[2])
 
 
 def approximate_impacts(model, base):

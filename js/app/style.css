@@ -92,7 +92,7 @@ header {
   padding: 10px 24px;
   border-bottom: 1px solid var(--rule);
 }
-header .title { font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+header .title { font-weight: 600; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
 header .title img { display: block; }
 header .note { color: var(--muted); font-size: 0.85rem; }
 

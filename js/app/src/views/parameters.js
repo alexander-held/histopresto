@@ -23,6 +23,13 @@ App.view({
 
     const free = s.params.map((p, i) => ({ p, i })).filter(({ p }) => p.constraint === "none" && !p.fixed);
     container.innerHTML =
+      (free.length
+        ? `<h2>Parameters without a constraint term</h2><div class="table-wrap"><table class="data"><tr><th>parameter</th><th class="num">best fit</th><th class="num">uncertainty</th><th class="num">range</th><th></th></tr>` +
+          free
+            .map(({ p, i }) => `<tr><td class="mono">${esc(p.name)}</td><td class="num">${num(f.pars[i])}</td><td class="num">${f.atBound[i] ? "–" : `± ${num(f.unc[i], 2)}`}</td><td class="num">${num(p.lower)} … ${num(p.upper)}</td><td class="dim">${f.atBound[i] ? "at the edge of its range" : ""}</td></tr>`)
+            .join("") +
+          `</table></div><h2>Parameters with a constraint term</h2>`
+        : "") +
       App.toolbar(
         `<label>filter <input id="pulls-filter" type="search" data-ui="pulls.filter" value="${esc(App.ui("pulls.filter", ""))}" placeholder="part of a name"></label>` +
           `<label>order <select data-ui="pulls.sort">${[["model", "as in the model"], ["pull", "largest pull first"], ["constraint", "most constrained first"]].map(([v, l]) => `<option value="${v}"${v === sort ? " selected" : ""}>${l}</option>`).join("")}</select></label>` +
@@ -30,14 +37,7 @@ App.view({
           `<span>${rows.length} shown</span>`
       ) +
       (rows.length ? `<div class="figure" id="pull-figure" style="max-width: 860px"></div>` : `<p class="empty">No constrained parameters match.</p>`) +
-      `<p class="note">Each point is (best fit − nominal value) / pre-fit uncertainty, the bar is the post-fit uncertainty in the same units. A bar shorter than the green band means the data constrain the parameter beyond its pre-fit uncertainty.</p>` +
-      (free.length
-        ? `<h2>Parameters without a constraint term</h2><div class="table-wrap"><table class="data"><tr><th>parameter</th><th class="num">best fit</th><th class="num">uncertainty</th><th class="num">range</th><th></th></tr>` +
-          free
-            .map(({ p, i }) => `<tr><td class="mono">${esc(p.name)}</td><td class="num">${num(f.pars[i])}</td><td class="num">${f.atBound[i] ? "–" : `± ${num(f.unc[i], 2)}`}</td><td class="num">${num(p.lower)} … ${num(p.upper)}</td><td class="dim">${f.atBound[i] ? "at the edge of its range" : ""}</td></tr>`)
-            .join("") +
-          `</table></div>`
-        : "");
+      `<p class="note">Each point is (best fit − nominal value) / pre-fit uncertainty, the bar is the post-fit uncertainty in the same units. A bar shorter than the green band means the data constrain the parameter beyond its pre-fit uncertainty.</p>`;
     if (rows.length) drawPulls(container.querySelector("#pull-figure"), rows);
   },
 });

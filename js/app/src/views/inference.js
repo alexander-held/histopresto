@@ -1,5 +1,5 @@
 // Ranking, Scans and Limits tabs.
-import { drawLimit, drawRanking, drawScan, esc, fmt, num, pull } from "@histopresto/viz";
+import { drawLimit, drawRanking, drawScan, drawScan2d, esc, fmt, num, pull } from "@histopresto/viz";
 import { App } from "../app.js";
 
 App.view({
@@ -44,44 +44,102 @@ App.view({
   },
 });
 
+const freeParams = (s) => s.params.map((p, i) => ({ p, i })).filter(({ p }) => !p.fixed);
+const paramSelect = (s, key, index, skip) =>
+  `<select data-ui="${key}" data-num style="max-width: 22rem">${freeParams(s).filter(({ i }) => i !== skip).map(({ p, i }) => `<option value="${i}"${i === index ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>`;
+const percent = (cl) => `${Number((100 * cl).toFixed(1))}%`;
+const rounded = (v) => Number(v.toPrecision(4));
+const inputs = (container, ...ids) => ids.map((id) => Number(container.querySelector(`#${id}`).value));
+const scanDim = (s) => (freeParams(s).length > 1 ? String(App.ui("scan.dim", "1")) : "1");
+const dimSwitch = (s) => App.segmented("scan.dim", scanDim(s), [["1", "one parameter"], ["2", "two parameters", freeParams(s).length < 2]]);
+const lowerPoint = (below) => (below > 1e-3 ? ` <b>The scan found a point ${num(below, 2)} below the fit result</b>, so the fit stopped in a local minimum; the regions are measured from the lowest point of the scan.` : "");
+
+function renderScan1d(container, state) {
+  const s = state.summary;
+  const f = state.fit;
+  const index = Number(App.ui("scan.index", s.poiIndex >= 0 ? s.poiIndex : freeParams(s)[0].i));
+  const p = s.params[index];
+  const done = state.scan && state.scan.index === index ? state.scan : null;
+  const [lo, hi] = done ? [done.values[0], done.values[done.values.length - 1]] : App.scanRange(index);
+  container.innerHTML =
+    App.toolbar(
+      dimSwitch(s) +
+        `<label>parameter ${paramSelect(s, "scan.index", index)}</label>` +
+        `<label>from <input id="scan-lo" type="number" step="any" value="${rounded(lo)}"></label>` +
+        `<label>to <input id="scan-hi" type="number" step="any" value="${rounded(hi)}"></label>` +
+        `<label>points <input id="scan-n" type="number" min="5" max="201" step="1" value="${done ? done.values.length : 25}"></label>` +
+        `<button id="scan-run" class="primary" data-job>Scan</button>`
+    ) +
+    (done ? `<div class="figure" id="scan-figure" style="max-width: 760px"></div><div id="scan-text"></div>` : `<p class="empty">The scan fixes ${esc(p.name)} at each value in turn and minimises over all other parameters.</p>`);
+  container.querySelector("#scan-run").onclick = () => {
+    const [a, b, n] = inputs(container, "scan-lo", "scan-hi", "scan-n");
+    if (a < b && Math.round(n) >= 3) App.actions.scan(index, a, b, Math.round(n));
+  };
+  if (!done) return;
+
+  drawScan(container.querySelector("#scan-figure"), done, { name: p.name, best: f.pars[index], unc: f.unc[index] });
+  // intervals are quoted around the fit result, or around the lowest scan point if that lies below it
+  const centre = done.reference < -1e-3 ? done.interval.min : f.pars[index];
+  const end = (v) => (Number.isFinite(v) ? num(v) : "?");
+  const side = (v, sign) => (Number.isFinite(v) ? `${sign}${num(Math.abs(v - centre))}` : `${sign}?`);
+  const open = done.intervals.some((iv) => !Number.isNaN(iv.lo) && !(Number.isFinite(iv.lo) && Number.isFinite(iv.hi)));
+  container.querySelector("#scan-text").innerHTML =
+    `<div class="results"><table class="data"><tr><th>confidence interval for ${esc(p.name)}</th><th class="num">−2 Δln <i>L</i></th><th class="num">from</th><th class="num">to</th><th class="num">around ${num(centre)}</th></tr>` +
+    done.intervals
+      .map((iv) =>
+        Number.isNaN(iv.lo)
+          ? `<tr><td>${percent(iv.cl)}</td><td class="num">${fmt(iv.level)}</td><td class="dim" colspan="3">no scan point inside</td></tr>`
+          : `<tr><td>${percent(iv.cl)}</td><td class="num">${fmt(iv.level)}</td><td class="num"><b>${end(iv.lo)}</b></td><td class="num"><b>${end(iv.hi)}</b></td><td class="num">${side(iv.lo, "−")} / ${side(iv.hi, "+")}</td></tr>`
+      )
+      .join("") +
+    `</table></div>` +
+    `<p class="note">The fit gave ${num(f.pars[index])}${f.unc[index] > 0 ? ` ± ${num(f.unc[index], 2)}` : ""}. The ends of the intervals are found with further fits between the scan points.` +
+    (open ? ` A <b>?</b> marks an end outside the scanned range.` : "") +
+    lowerPoint(-done.reference) +
+    ` ${done.values.length} scan points in ${App.duration(done.seconds)}.</p>`;
+}
+
+function renderScan2d(container, state) {
+  const s = state.summary;
+  const f = state.fit;
+  const [ix, iy] = App.scanPair();
+  const done = state.scan2d && state.scan2d.indices[0] === ix && state.scan2d.indices[1] === iy ? state.scan2d : null;
+  const names = [s.params[ix].name, s.params[iy].name];
+  const axis = (k, index, grid) => {
+    const [lo, hi] = grid ? [grid[0], grid[grid.length - 1]] : App.scanRange(index);
+    return (
+      `<label>${k} ${paramSelect(s, `scan.${k}`, index, k === "x" ? -1 : ix)}</label>` +
+      `<label>from <input id="scan-${k}lo" type="number" step="any" value="${rounded(lo)}"></label>` +
+      `<label>to <input id="scan-${k}hi" type="number" step="any" value="${rounded(hi)}"></label>` +
+      `<label>points <input id="scan-${k}n" type="number" min="5" max="101" step="1" value="${grid ? grid.length : 15}"></label>`
+    );
+  };
+  container.innerHTML =
+    App.toolbar(dimSwitch(s) + axis("x", ix, done && done.x)) +
+    App.toolbar(axis("y", iy, done && done.y) + `<button id="scan-run" class="primary" data-job>Scan</button>`) +
+    (done ? `<div class="figure" id="scan-figure" style="max-width: 640px"></div><p class="note" id="scan-text"></p>` : `<p class="empty">The scan fixes ${esc(names[0])} and ${esc(names[1])} at each point of a grid and minimises over all other parameters: one fit per point.</p>`);
+  container.querySelector("#scan-run").onclick = () => {
+    const [xa, xb, xn, ya, yb, yn] = inputs(container, "scan-xlo", "scan-xhi", "scan-xn", "scan-ylo", "scan-yhi", "scan-yn");
+    if (xa < xb && ya < yb && Math.round(xn) >= 3 && Math.round(yn) >= 3) App.actions.scan2d([ix, iy], [xa, xb, Math.round(xn)], [ya, yb, Math.round(yn)]);
+  };
+  if (!done) return;
+
+  drawScan2d(container.querySelector("#scan-figure"), done, { names, best: [f.pars[ix], f.pars[iy]] });
+  const z = done.twiceDeltaNll.flat();
+  const failed = z.filter((v) => !Number.isFinite(v)).length;
+  container.querySelector("#scan-text").innerHTML =
+    `Regions where −2 Δln <i>L</i> is below ${done.levels.map((l) => `${fmt(l.level)} (${percent(l.cl)} CL)`).join(" and ")}, the values for two parameters. ` +
+    `The contours are interpolated between the grid points.` +
+    (failed ? ` The likelihood is not defined at ${failed} of the points.` : "") +
+    lowerPoint(-Math.min(...z.filter(Number.isFinite))) +
+    ` ${z.length} fits in ${App.duration(done.seconds)}.`;
+}
+
 App.view({
   id: "scans",
   title: "Scans",
   needsFit: true,
-  render(container, state) {
-    const s = state.summary;
-    const f = state.fit;
-    const candidates = s.params.map((p, i) => ({ p, i })).filter(({ p }) => !p.fixed);
-    const index = Number(App.ui("scan.index", s.poiIndex >= 0 ? s.poiIndex : candidates[0].i));
-    const p = s.params[index];
-    const done = state.scan && state.scan.index === index ? state.scan : null;
-    const [lo, hi] = done ? [done.values[0], done.values[done.values.length - 1]] : App.scanRange(index);
-    container.innerHTML =
-      App.toolbar(
-        `<label>parameter <select data-ui="scan.index" data-num style="max-width: 22rem">${candidates.map(({ p: q, i }) => `<option value="${i}"${i === index ? " selected" : ""}>${esc(q.name)}</option>`).join("")}</select></label>` +
-          `<label>from <input id="scan-lo" type="number" step="any" value="${Number(lo.toPrecision(4))}"></label>` +
-          `<label>to <input id="scan-hi" type="number" step="any" value="${Number(hi.toPrecision(4))}"></label>` +
-          `<label>points <input id="scan-n" type="number" min="5" max="201" step="1" value="${done ? done.values.length : 25}"></label>` +
-          `<button id="scan-run" class="primary" data-job>Scan</button>`
-      ) +
-      (done ? `<div class="figure" id="scan-figure" style="max-width: 760px"></div><div id="scan-text" class="note"></div>` : `<p class="empty">The scan fixes ${esc(p.name)} at each value in turn and minimises over all other parameters.</p>`);
-    container.querySelector("#scan-run").onclick = () => {
-      const a = Number(container.querySelector("#scan-lo").value);
-      const b = Number(container.querySelector("#scan-hi").value);
-      const points = Math.round(Number(container.querySelector("#scan-n").value));
-      if (a < b && points >= 3) App.actions.scan(index, a, b, points);
-    };
-    if (!done) return;
-
-    const y = done.twiceDeltaNll;
-    drawScan(container.querySelector("#scan-figure"), done, { name: p.name, best: f.pars[index], unc: f.unc[index] });
-    const iv = done.interval;
-    const side = (v, sign) => (Number.isFinite(v) ? `${sign}${num(Math.abs(v - iv.min), 2)}` : `${sign}? (outside the scanned range)`);
-    container.querySelector("#scan-text").innerHTML =
-      `Minimum of the scan at <b>${num(iv.min)}</b>, interval where −2 Δln <i>L</i> &lt; 1: <b>${side(iv.lo, "−")} / ${side(iv.hi, "+")}</b>. ` +
-      `The fit gave ${num(f.pars[index])}${f.unc[index] > 0 ? ` ± ${num(f.unc[index], 2)}` : ""}.` +
-      (Math.min(...y) < -1e-3 ? ` <b>The scan found a point ${num(-Math.min(...y), 2)} below the fit result</b>, so the fit stopped in a local minimum.` : "");
-  },
+  render: (container, state) => (scanDim(state.summary) === "2" ? renderScan2d : renderScan1d)(container, state),
 });
 
 App.view({

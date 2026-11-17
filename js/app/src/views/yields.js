@@ -39,7 +39,7 @@ App.view({
           `<label><input type="checkbox" data-ui="yields.log"${logy ? " checked" : ""}> logarithmic</label>` +
           (s.channels.length > 1 ? `<label>channel <select data-ui="yields.channel"><option value="all">all</option>${s.channels.map((c) => `<option${c.name === which ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>` : "")
       ) + `<div class="figures${channels.length === 1 ? " single" : ""}">${channels.map(() => `<div class="figure"></div>`).join("")}</div>` +
-      `<p class="note">The hatched band is the ${mode}-fit uncertainty of the total expectation${mode === "post" ? ", propagated from the covariance matrix of the fit" : ", from the widths of the constraint terms (unconstrained parameters do not contribute)"}.</p>`;
+      `<p class="note">The hatched band is the ${mode}-fit uncertainty of the total expectation${mode === "post" ? ", propagated from the covariance matrix of the fit" : ", from the widths of the constraint terms (unconstrained parameters do not contribute)"}.${state.asimov ? " The data points are the Asimov data." : ""}</p>`;
     const boxes = container.querySelectorAll(".figure");
     channels.forEach((ch, i) => drawYields(boxes[i], ch, stack(s, ch), { mode, logy, wide: channels.length === 1 }));
   },
