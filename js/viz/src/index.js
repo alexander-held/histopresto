@@ -2,7 +2,7 @@
 // names, not objects of @histopresto/core. Colours are CSS custom properties that the page defines (see ../README.md).
 export * as plot from "./plot.js";
 export { layoutKey } from "./plot.js";
-export { esc, fmt, num, yieldFmt, short } from "./format.js";
+export { esc, fmt, num, yieldFmt, short, percent } from "./format.js";
 export { pull, drawPulls } from "./pulls.js";
 export { drawCorrelations } from "./correlations.js";
 export { drawRanking } from "./ranking.js";

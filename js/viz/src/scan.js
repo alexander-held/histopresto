@@ -1,10 +1,9 @@
 // Profile likelihood scans of one and of two parameters.
 import { figure } from "./plot.js";
 import { contour, refine } from "./contour.js";
-import { num } from "./format.js";
+import { num, percent } from "./format.js";
 
 const BANDS = ["var(--band-1)", "var(--band-2)"];
-const percent = (cl) => `${Number((100 * cl).toFixed(1))}%`;
 
 // scan: {values, twiceDeltaNll, reference, intervals: [{cl, level, lo, hi}]}, intervals ordered by cl;
 // best, unc: fit result for the parameter (unc > 0 adds the parabola)

@@ -220,25 +220,25 @@ def conditional(model, lik, base, index, value):
         inside = where >= 0 if cov is not None else np.zeros(n, dtype=bool)
         w = where[inside]
         rows = np.arange(n)
-        # gain: shift of the free parameters per unit shift of the held ones; C: covariance of the free ones given the held ones
-        gain = np.zeros((n, len(known)))
+        # gain: shift of the free parameters in the covariance matrix per unit shift of the held ones; C: covariance of the free ones given the held ones
+        gain = None
         C = np.zeros((n, n))
         C[rows[~inside], rows[~inside]] = _diag_guess(model, free[~inside])
         if cov is not None:
             sub = cov[np.ix_(w, w)]
             if known:
-                gain[inside] = cov[np.ix_(w, at)] @ S_inv
-                sub = sub - gain[inside] @ cov[np.ix_(at, w)]
+                gain = cov[np.ix_(w, at)] @ S_inv
+                sub = sub - gain @ cov[np.ix_(at, w)]
             C[np.ix_(rows[inside], rows[inside])] = 0.5 * sub
-        start = SimpleNamespace(C=C, gain=gain, known=known, inside=inside)
+        start = SimpleNamespace(C=C, gain=gain, known=known, moved=free[inside])
         base.cache[key] = start
     # linear prediction of where the other parameters go
     x0 = base.pars.copy()
     x0[held] = values
     if start.known:
         shift = np.array([values[key.index(p)] - base.pars[p] for p in start.known])
-        p = free[start.inside]
-        x0[p] = np.minimum(np.maximum(base.pars[p] + start.gain[start.inside] @ shift, model.lower[p]), model.upper[p])
+        p = start.moved
+        x0[p] = np.minimum(np.maximum(base.pars[p] + start.gain @ shift, model.lower[p]), model.upper[p])
     res = minimize(lik, x0, free, C=start.C, tol=1e-8)
     if not math.isfinite(res.f):
         # the prediction left the region where the model is defined: start from the base fit instead
@@ -279,9 +279,13 @@ def scan(model, lik, base, index, values):
         b = (values[k + step], out[k + step] - ref)
         if not math.isfinite(b[1]):
             return b[0]
+        # regula falsi on the square root, which is a straight line for a parabola
+        def root(y):
+            return math.sqrt(max(y, 0.0))
+
         x = b[0]
         for _ in range(8):
-            x = a[0] + ((level - a[1]) / (b[1] - a[1])) * (b[0] - a[0])
+            x = a[0] + ((root(level) - root(a[1])) / (root(b[1]) - root(a[1]))) * (b[0] - a[0])
             y = conditional(model, lik, base, index, x).twice_nll - base.twice_nll - ref
             if not math.isfinite(y) or abs(y - level) < 1e-4:
                 break

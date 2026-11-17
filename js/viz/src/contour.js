@@ -2,9 +2,11 @@
 
 const BIG = 1e30;
 
-// finer grid by cubic (Catmull-Rom) interpolation, exact for quadratic surfaces; x and y evenly spaced
-function refine(x, y, z, factor = 4) {
-  if (x.length < 3 || y.length < 3 || z.some((row) => row.some((v) => !Number.isFinite(v)))) return { x, y, z };
+// finer grid (about 60 points along the longer side, unless it is finer already) by cubic
+// (Catmull-Rom) interpolation, exact for quadratic surfaces; x and y evenly spaced
+function refine(x, y, z) {
+  const factor = Math.round(60 / Math.max(x.length, y.length));
+  if (factor < 2 || x.length < 3 || y.length < 3 || z.some((row) => row.some((v) => !Number.isFinite(v)))) return { x, y, z };
   const up = (v) => {
     const n = v.length;
     const at = (i) => (i < 0 ? 3 * v[0] - 3 * v[1] + v[2] : i >= n ? 3 * v[n - 1] - 3 * v[n - 2] + v[n - 3] : v[i]);
@@ -19,12 +21,9 @@ function refine(x, y, z, factor = 4) {
     out.push(v[n - 1]);
     return out;
   };
-  const rows = z.map(up);
-  const fine = rows[0].map(() => []);
-  rows[0].forEach((_, j) => up(rows.map((row) => row[j])).forEach((v, i) => (fine[j][i] = v)));
-  // fine is indexed [j][i]: transpose back
-  const X = up(x);
-  return { x: X, y: up(y), z: X.map((_, i) => fine.map((col) => col[i])) };
+  const rows = z.map(up); // finer in y
+  const columns = rows[0].map((_, j) => up(rows.map((row) => row[j]))); // and in x: columns[j][i]
+  return { x: up(x), y: up(y), z: columns[0].map((_, i) => columns.map((column) => column[i])) };
 }
 
 // Lines along which z equals the level, as polylines [[x, y], ...] (marching squares). With closed,

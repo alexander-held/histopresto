@@ -1,5 +1,5 @@
 // Ranking, Scans and Limits tabs.
-import { drawLimit, drawRanking, drawScan, drawScan2d, esc, fmt, num, pull } from "@histopresto/viz";
+import { drawLimit, drawRanking, drawScan, drawScan2d, esc, fmt, num, percent, pull } from "@histopresto/viz";
 import { App } from "../app.js";
 
 App.view({
@@ -47,7 +47,6 @@ App.view({
 const freeParams = (s) => s.params.map((p, i) => ({ p, i })).filter(({ p }) => !p.fixed);
 const paramSelect = (s, key, index, skip) =>
   `<select data-ui="${key}" data-num style="max-width: 22rem">${freeParams(s).filter(({ i }) => i !== skip).map(({ p, i }) => `<option value="${i}"${i === index ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>`;
-const percent = (cl) => `${Number((100 * cl).toFixed(1))}%`;
 const rounded = (v) => Number(v.toPrecision(4));
 const inputs = (container, ...ids) => ids.map((id) => Number(container.querySelector(`#${id}`).value));
 const scanDim = (s) => (freeParams(s).length > 1 ? String(App.ui("scan.dim", "1")) : "1");
@@ -82,7 +81,7 @@ function renderScan1d(container, state) {
   const centre = done.reference < -1e-3 ? done.interval.min : f.pars[index];
   const end = (v) => (Number.isFinite(v) ? num(v) : "?");
   const side = (v, sign) => (Number.isFinite(v) ? `${sign}${num(Math.abs(v - centre))}` : `${sign}?`);
-  const open = done.intervals.some((iv) => !Number.isNaN(iv.lo) && !(Number.isFinite(iv.lo) && Number.isFinite(iv.hi)));
+  const openEnded = done.intervals.some((iv) => !Number.isNaN(iv.lo) && !(Number.isFinite(iv.lo) && Number.isFinite(iv.hi)));
   container.querySelector("#scan-text").innerHTML =
     `<div class="results"><table class="data"><tr><th>confidence interval for ${esc(p.name)}</th><th class="num">−2 Δln <i>L</i></th><th class="num">from</th><th class="num">to</th><th class="num">around ${num(centre)}</th></tr>` +
     done.intervals
@@ -94,7 +93,7 @@ function renderScan1d(container, state) {
       .join("") +
     `</table></div>` +
     `<p class="note">The fit gave ${num(f.pars[index])}${f.unc[index] > 0 ? ` ± ${num(f.unc[index], 2)}` : ""}. The ends of the intervals are found with further fits between the scan points.` +
-    (open ? ` A <b>?</b> marks an end outside the scanned range.` : "") +
+    (openEnded ? ` A <b>?</b> marks an end outside the scanned range.` : "") +
     lowerPoint(-done.reference) +
     ` ${done.values.length} scan points in ${App.duration(done.seconds)}.</p>`;
 }

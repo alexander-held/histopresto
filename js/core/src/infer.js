@@ -210,9 +210,11 @@ async function scan(model, lik, base, index, values, ctx = NO_CTX) {
     let a = [values[k], out[k] - ref];
     let b = [values[k + dir], out[k + dir] - ref];
     if (!Number.isFinite(b[1])) return b[0];
+    // regula falsi on the square root, which is a straight line for a parabola
+    const root = (y) => Math.sqrt(Math.max(y, 0));
     let x = b[0];
     for (let it = 0; it < 8; it++) {
-      x = a[0] + ((level - a[1]) / (b[1] - a[1])) * (b[0] - a[0]);
+      x = a[0] + ((root(level) - root(a[1])) / (root(b[1]) - root(a[1]))) * (b[0] - a[0]);
       const y = conditional(model, lik, base, index, x).twiceNll - base.twiceNll - ref;
       if (!Number.isFinite(y) || Math.abs(y - level) < 1e-4) break;
       if (y < level) a = [x, y];
