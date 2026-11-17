@@ -1,10 +1,10 @@
 // Reading and checking a pyhf workspace (JSON).
 
-const MODIFIER_TYPES = ["histosys", "lumi", "normfactor", "normsys", "shapefactor", "shapesys", "staterror"];
+const MODIFIER_TYPES = ["histosys", "lumi", "normfactor", "normsys", "shapefactor", "shapesys", "staterror", "purefunc"];
 const isNumber = (v) => typeof v === "number" && Number.isFinite(v);
 const isNumberArray = (v, n) => Array.isArray(v) && v.every(isNumber) && (n === undefined || v.length === n);
 
-// returns {channels, observations: {name: data}, measurements}; throws an Error listing what is wrong
+// returns {channels, observations: {name: data}, measurements, bindings}; throws an Error listing what is wrong
 function parseWorkspace(input) {
   let ws = input;
   if (typeof input === "string") {
@@ -103,12 +103,22 @@ function parseWorkspace(input) {
     };
   });
 
+  // expressions for purefunc modifiers
+  const bindings = ws.bindings === undefined ? [] : ws.bindings;
+  if (!Array.isArray(bindings)) bad('"bindings" is not a list');
+  else {
+    for (const b of bindings) {
+      const ok = b && Array.isArray(b.names) && b.names.length > 0 && b.names.every((n) => typeof n === "string");
+      if (!ok || typeof b.expression !== "string" || typeof b.language !== "string") bad('a binding needs a list of "names", an "expression" and a "language"');
+    }
+  }
+
   if (problems.length) {
     const shown = problems.slice(0, 8).map((p) => `• ${p}`);
     if (problems.length > 8) shown.push(`• … and ${problems.length - 8} more`);
     throw new Error(`The workspace has problems:\n${shown.join("\n")}`);
   }
-  return { channels: ws.channels, observations, measurements };
+  return { channels: ws.channels, observations, measurements, bindings };
 }
 
 export { MODIFIER_TYPES, parseWorkspace };

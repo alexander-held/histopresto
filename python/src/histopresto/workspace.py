@@ -3,7 +3,7 @@
 import json
 import math
 
-MODIFIER_TYPES = ["histosys", "lumi", "normfactor", "normsys", "shapefactor", "shapesys", "staterror"]
+MODIFIER_TYPES = ["histosys", "lumi", "normfactor", "normsys", "shapefactor", "shapesys", "staterror", "purefunc"]
 
 
 def _is_number(v):
@@ -15,7 +15,7 @@ def _is_number_array(v, n=None):
 
 
 def parse_workspace(source):
-    """Returns {channels, observations: {name: data}, measurements}; raises ValueError listing what is wrong."""
+    """Returns {channels, observations: {name: data}, measurements, bindings}; raises ValueError listing what is wrong."""
     ws = source
     if isinstance(source, (str, bytes)):
         try:
@@ -123,9 +123,19 @@ def parse_workspace(source):
             }
         )
 
+    # expressions for purefunc modifiers
+    bindings = ws.get("bindings", [])
+    if not isinstance(bindings, list):
+        bad('"bindings" is not a list')
+    else:
+        for b in bindings:
+            ok = isinstance(b, dict) and isinstance(b.get("names"), list) and b["names"] and all(isinstance(n, str) for n in b["names"])
+            if not ok or not isinstance(b.get("expression"), str) or not isinstance(b.get("language"), str):
+                bad('a binding needs a list of "names", an "expression" and a "language"')
+
     if problems:
         shown = [f"• {p}" for p in problems[:8]]
         if len(problems) > 8:
             shown.append(f"• … and {len(problems) - 8} more")
         raise ValueError("The workspace has problems:\n" + "\n".join(shown))
-    return {"channels": ws["channels"], "observations": observations, "measurements": measurements}
+    return {"channels": ws["channels"], "observations": observations, "measurements": measurements, "bindings": bindings}

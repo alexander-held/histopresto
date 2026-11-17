@@ -69,16 +69,35 @@ const limit = await infer.limit(model, lik, fit);      // limit.observed, limit.
 The packages are ES modules and are not published to npm yet; inside this repository they resolve
 through npm workspaces.
 
+## Expressions
+
+Workspaces may scale samples by functions of parameters, in the format of
+[pyhf PR 2717](https://github.com/scikit-hep/pyhf/pull/2717) (not merged, so the format can still
+change): a `purefunc` modifier names a function that a top-level `bindings` list defines.
+
+```json
+"modifiers": [{"name": "k_ggF", "type": "purefunc"}],
+...
+"bindings": [{"names": ["k_ggF", "k_VBF"], "expression": "(kappa_g**2, sqrt(kappa_V) + k_ggF / 10)", "language": "sympy"}]
+```
+
+Symbols that are not bindings become unconstrained parameters (start 1, range 0 to 10), configured
+like any other in the measurement. The expressions are parsed here, without sympy; supported are
+numbers, `pi`, `E`, `+ - * / **`, parentheses and `sqrt exp log ln sin cos tan tanh asin acos atan sinh cosh Abs`. Bindings may
+refer to each other in any order as long as there is no cycle (pyhf only follows one level). The
+gradient is exact, by a reverse sweep over the compiled expressions.
+
 ## Tests
 
 `tests/reference/reference.json` holds numbers from pyhf for the workspaces in
 `tests/reference/workspaces/`: parameter order and defaults, yields, likelihood, gradient, best fit,
 uncertainties, correlations, CLs, limits and discovery significance. `tests/js` and `tests/python`
-run the same 6819 checks against it. `tests/cross` checks that the two implementations take the same
+run the same 7318 checks against it. `tests/cross` checks that the two implementations take the same
 number of iterations and agree to rounding.
 
 Regenerating the reference (`pixi run reference`) takes about five minutes, nearly all of it pyhf on
-the largest workspace.
+the largest workspace. It skips the two workspaces with expressions, which need pyhf from PR 2717 with
+jax: `pixi run -e purefunc-ref reference-purefunc`.
 
 ## Known limitations
 

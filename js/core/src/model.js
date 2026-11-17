@@ -2,6 +2,7 @@
 // Channel, sample and parameter ordering follow pyhf, so vectors compare element by element.
 import { lgamma } from "./numerics.js";
 import { MODIFIER_TYPES } from "./workspace.js";
+import { parseBindings, compileBindings, runTape, backTape } from "./expression.js";
 const LN2PI = Math.log(2 * Math.PI);
 
 const A_INVERSE = [
@@ -40,6 +41,12 @@ function Model(ws, measurementIndex = 0, options = {}) {
   }
   this.samples = [...sampleSet].sort();
   const modifiers = [...modifierKeys.keys()].sort().map((k) => modifierKeys.get(k));
+
+  // expressions of purefunc modifiers; their symbols are parameters
+  const bindings = parseBindings(ws.bindings || []);
+  for (const [name, type] of modifiers) {
+    if (type === "purefunc" && !bindings.trees.has(name)) throw new Error(`The purefunc modifier "${name}" refers to a binding that is not declared.`);
+  }
 
   this.channels = [];
   let offset = 0;
@@ -114,6 +121,10 @@ function Model(ws, measurementIndex = 0, options = {}) {
           sigmas: sigmas.map((s) => (s === 0 ? 1 : s)),
         });
       }
+      continue;
+    }
+    if (type === "purefunc") {
+      for (const name of bindings.symbols) require(name, scalar("free", 1, [0, 10]));
       continue;
     }
     const seen = new Set();
@@ -207,7 +218,8 @@ function Model(ws, measurementIndex = 0, options = {}) {
     this.sets.push(set);
     setByName[name] = set;
   }
-  for (const [name, type] of modifiers) setByName[name].types.push(type);
+  for (const [name, type] of modifiers) if (type !== "purefunc") setByName[name].types.push(type);
+  for (const name of bindings.symbols) setByName[name].types.push("purefunc");
   this.nPars = nPars;
 
   // flat per-parameter arrays
@@ -282,6 +294,10 @@ function Model(ws, measurementIndex = 0, options = {}) {
     stat[name].bins.forEach((b, i) => (map[b] = setByName[name].start + i));
     statIndex[name] = map;
   }
+  const tape = compileBindings(bindings.trees, (name) => setByName[name].start);
+  this.tape = tape;
+  this.slotVal = new Float64Array(tape.n);
+  this.slotAdj = new Float64Array(tape.n);
   this.blocks = [];
   this.channelBlocks = this.channels.map(() => []);
   let cell = 0;
@@ -295,9 +311,14 @@ function Model(ws, measurementIndex = 0, options = {}) {
       const ns = [];
       const hs = [];
       const gam = [];
+      const fn = [];
       for (const [name, type] of modifiers) {
         const mod = d.mods[`${type}/${name}`];
         if (!mod) continue;
+        if (type === "purefunc") {
+          fn.push(name);
+          continue;
+        }
         const start = setByName[name].start;
         if (type === "normfactor" || type === "lumi") scal.push(start);
         else if (type === "normsys") ns.push({ p: start, hi: mod.data.hi, lo: mod.data.lo });
@@ -314,6 +335,8 @@ function Model(ws, measurementIndex = 0, options = {}) {
         cell,
         nominal,
         scal: Int32Array.from(scal),
+        fn: Int32Array.from(fn.map((name) => tape.slots[name])), // slots of the tape that multiply the sample
+        fnPars: [...new Set(fn.flatMap((name) => tape.pars[name]))], // parameters these depend on
         nsPar: Int32Array.from(ns.map((m) => m.p)),
         nsLnHi: Float64Array.from(ns.map((m) => Math.log(m.hi))),
         nsLnLo: Float64Array.from(ns.map((m) => Math.log(m.lo))),
@@ -343,11 +366,13 @@ function Model(ws, measurementIndex = 0, options = {}) {
 
 // expected events for the given parameters; results are left in this.nu and this.cellNu
 Model.prototype.evaluate = function (pars) {
-  const { nu, cellNu, cellBase, cellGamma, blockFactor } = this;
+  const { nu, cellNu, cellBase, cellGamma, blockFactor, slotVal } = this;
   nu.fill(0);
+  runTape(this.tape, pars, slotVal);
   for (const blk of this.blocks) {
     let F = 1;
     for (let k = 0; k < blk.scal.length; k++) F *= pars[blk.scal[k]];
+    for (let k = 0; k < blk.fn.length; k++) F *= slotVal[blk.fn[k]];
     for (let k = 0; k < blk.nsPar.length; k++) {
       const a = pars[blk.nsPar[k]];
       let v;
@@ -406,7 +431,8 @@ Model.prototype.evaluate = function (pars) {
 // adds to grad the derivative of sum_cells cellWeight * cellNu with respect to the parameters;
 // evaluate(pars) must have been called before with the same parameters
 Model.prototype.accumulate = function (pars, grad, blocks) {
-  const { cellNu, cellBase, cellGamma, blockFactor, cellWeight } = this;
+  const { cellNu, cellBase, cellGamma, blockFactor, cellWeight, slotVal, slotAdj } = this;
+  slotAdj.fill(0);
   for (const blk of blocks || this.blocks) {
     const n = blk.n;
     const c0 = blk.cell;
@@ -428,8 +454,20 @@ Model.prototype.accumulate = function (pars, grad, blocks) {
       else {
         let rest = 1;
         for (let j = 0; j < blk.scal.length; j++) if (j !== k) rest *= pars[blk.scal[j]];
+        for (let j = 0; j < blk.fn.length; j++) rest *= slotVal[blk.fn[j]];
         for (let j = 0; j < blk.nsPar.length; j++) rest *= blk.nsVal[j];
         grad[p] += U * rest;
+      }
+    }
+    for (let k = 0; k < blk.fn.length; k++) {
+      const s = blk.fn[k];
+      if (slotVal[s] !== 0) slotAdj[s] += T / slotVal[s];
+      else {
+        let rest = 1;
+        for (let j = 0; j < blk.scal.length; j++) rest *= pars[blk.scal[j]];
+        for (let j = 0; j < blk.fn.length; j++) if (j !== k) rest *= slotVal[blk.fn[j]];
+        for (let j = 0; j < blk.nsPar.length; j++) rest *= blk.nsVal[j];
+        slotAdj[s] += U * rest;
       }
     }
     for (let k = 0; k < blk.nsPar.length; k++) grad[blk.nsPar[k]] += (T * blk.nsDer[k]) / blk.nsVal[k];
@@ -466,6 +504,7 @@ Model.prototype.accumulate = function (pars, grad, blocks) {
       }
     }
   }
+  backTape(this.tape, slotVal, slotAdj, grad);
 };
 
 // expected main and auxiliary data, as pyhf's Model.expected_data

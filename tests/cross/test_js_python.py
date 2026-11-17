@@ -15,6 +15,8 @@ WORKSPACES = {
     "counting": REPO / "js/app/examples/counting.json",
     "search": REPO / "js/app/examples/search.json",
     "large": REPO / "tests/reference/workspaces/large.json",
+    "purefunc": REPO / "tests/reference/workspaces/purefunc.json",
+    "purefunc_mixed": REPO / "tests/reference/workspaces/purefunc_mixed.json",
 }
 
 
