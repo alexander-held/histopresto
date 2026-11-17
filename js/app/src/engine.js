@@ -16,6 +16,8 @@ J.load = async function (s, args) {
   const ws = parseWorkspace(args.workspace);
   const model = new Model(ws, args.measurement || 0, { poiBounds: args.poiBounds || undefined });
   s.model = model;
+  // Asimov data: the expectation at the initial parameter values takes the place of the observed data
+  if (args.asimov) model.observed = model.expectedData(model.init);
   s.lik = model.likelihood(model.observed);
   s.base = null;
   const kinds = { normal: "Gaussian", poisson: "Poisson", free: "none" };
@@ -54,11 +56,26 @@ J.load = async function (s, args) {
   };
 };
 
+// time spent computing, without the pauses in which progress is reported
+function stopwatch(ctx) {
+  const start = performance.now();
+  let paused = 0;
+  const tick = async (info) => {
+    const t = performance.now();
+    await ctx.tick(info);
+    paused += performance.now() - t;
+  };
+  return { tick, seconds: () => (performance.now() - start - paused) / 1000 };
+}
+
 J.fit = async function (s, args, ctx) {
-  const base = await infer.fit(s.model, s.lik, {}, ctx);
+  const watch = stopwatch(ctx);
+  const base = await infer.fit(s.model, s.lik, {}, watch);
+  const seconds = watch.seconds();
   s.base = base;
   await ctx.tick({ label: "post-fit yields" });
   return {
+    seconds,
     pars: base.pars,
     unc: base.unc,
     twiceNll: base.twiceNll,
@@ -72,7 +89,16 @@ J.fit = async function (s, args, ctx) {
 };
 
 J.ranking = async (s, args, ctx) => infer.ranking(s.model, s.lik, s.base, args.indices, ctx);
-J.scan = async (s, args, ctx) => infer.scan(s.model, s.lik, s.base, args.index, num.linspace(args.lo, args.hi, args.points), ctx);
+J.scan = async (s, args, ctx) => {
+  const watch = stopwatch(ctx);
+  const r = await infer.scan(s.model, s.lik, s.base, args.index, num.linspace(args.lo, args.hi, args.points), watch);
+  return { ...r, seconds: watch.seconds() };
+};
+J.scan2d = async (s, args, ctx) => {
+  const watch = stopwatch(ctx);
+  const r = await infer.scan2d(s.model, s.lik, s.base, args.indices, num.linspace(...args.x), num.linspace(...args.y), watch);
+  return { ...r, seconds: watch.seconds() };
+};
 J.limit = async (s, args, ctx) => infer.limit(s.model, s.lik, s.base, args, ctx);
 J.significance = async (s, args, ctx) => infer.significance(s.model, s.lik, s.base, ctx);
 

@@ -10,7 +10,8 @@ other fitter.
 | `drawCorrelations(el, names, rho)` | correlation matrix |
 | `drawRanking(el, rows, poiName)` | impact on the parameter of interest, with pulls |
 | `drawYields(el, channel, layers, options)` | data and stacked expectation of one channel, with ratio |
-| `drawScan(el, scan, options)` | profile likelihood scan |
+| `drawScan(el, scan, options)` | profile likelihood scan of one parameter with 68.3% and 95% intervals |
+| `drawScan2d(el, scan, options)` | 68.3% and 95% contours of a scan of two parameters |
 | `drawLimit(el, limit, options)` | CLs against the parameter of interest, with expected bands |
 
 The shape of each argument is described above the function in `src/`. `pull(param, value, unc)`

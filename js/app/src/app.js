@@ -3,10 +3,11 @@ import { esc, fmt, num, yieldFmt, layoutKey } from "@histopresto/viz";
 import { Engine, CANCELLED } from "./engine.js";
 
 const $ = (id) => document.getElementById(id);
+const duration = (s) => (s < 1 ? `${Math.max(1, Math.round(1000 * s))} ms` : `${s.toFixed(s < 10 ? 2 : 1)} s`);
 const SLOTS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)", "var(--s6)", "var(--s7)"];
 
 const App = {
-  $, esc, fmt, num, yieldFmt,
+  $, esc, fmt, num, yieldFmt, duration,
   views: [],
   state: null,
   current: "model",
@@ -17,7 +18,7 @@ const App = {
 };
 
 function freshState(name, source) {
-  return { name, source, measurement: 0, poiBounds: null, summary: null, fit: null, exact: new Map(), scan: null, limit: null, significance: null, ui: { ...App.presets } };
+  return { name, source, measurement: 0, poiBounds: null, asimov: false, summary: null, fit: null, exact: new Map(), scan: null, scan2d: null, limit: null, significance: null, ui: { ...App.presets } };
 }
 
 // ----- errors, progress -----
@@ -65,7 +66,7 @@ async function load(name, source) {
   await open(state);
 }
 async function open(state) {
-  const summary = await App.run("load", { workspace: state.source, measurement: state.measurement, poiBounds: state.poiBounds }, "reading the workspace");
+  const summary = await App.run("load", { workspace: state.source, measurement: state.measurement, poiBounds: state.poiBounds, asimov: state.asimov }, "reading the workspace");
   if (!summary) return;
   state.summary = summary;
   App.state = state;
@@ -84,6 +85,7 @@ async function open(state) {
     $("poi-lo").value = summary.poiBounds[0];
     $("poi-hi").value = summary.poiBounds[1];
   }
+  $("dataset").value = state.asimov ? "asimov" : "observed";
   $("download").disabled = true;
   $("status").innerHTML = "";
   if (App.views.find((v) => v.id === App.current).needsPoi && summary.poiIndex < 0) App.current = "model";
@@ -93,7 +95,7 @@ async function open(state) {
   if (App.state === state && state.fit && pendingActions.length) {
     const todo = pendingActions.splice(0);
     for (const name of todo) {
-      const usable = name in App.actions && (name === "scan" || (state.summary.poiIndex >= 0 && (name !== "ranking" || state.fit.impacts.length)));
+      const usable = name in App.actions && (name.startsWith("scan") || (state.summary.poiIndex >= 0 && (name !== "ranking" || state.fit.impacts.length)));
       if (usable) await App.actions[name]();
     }
   }
@@ -118,7 +120,7 @@ async function fit() {
   if (!result || state !== App.state) return;
   state.fit = result;
   state.exact = new Map();
-  state.scan = state.limit = state.significance = null;
+  state.scan = state.scan2d = state.limit = state.significance = null;
   const s = state.summary;
   const st = result.status;
   let html;
@@ -126,8 +128,9 @@ async function fit() {
     html = `<span class="warn">The likelihood is not defined at the starting values: a bin with data has an expectation of zero or below.</span>`;
   } else {
     html = st.converged ? `<span class="ok">Fit converged</span>` : `<span class="warn">${st.posDef ? "Fit did not converge" : "The data do not determine all parameters (covariance matrix not positive definite); uncertainties are unreliable"}</span>`;
-    html += ` · −2 ln <i>L</i> = <b>${fmt(result.twiceNll, 2)}</b>`;
+    html += ` · −2 ln <i>L</i> = <b>${fmt(result.twiceNll, 2)}</b> · fit time <b>${duration(result.seconds)}</b>`;
   }
+  if (state.asimov) html = `<b>Asimov data</b> · ${html}`;
   if (s.poiIndex >= 0) {
     const p = s.poiIndex;
     html += ` · ${esc(s.poiName)} = <b>${num(result.pars[p])}${result.atBound[p] ? "</b> (at the edge of its range)" : ` ± ${num(result.unc[p], 2)}</b>`}`;
@@ -144,6 +147,24 @@ App.scanRange = function (index) {
   const p = s.params[index];
   const sigma = f.unc[index] > 0 ? f.unc[index] : (p.upper - p.lower) / 10;
   return [Math.max(p.lower, f.pars[index] - 3 * sigma), Math.min(p.upper, f.pars[index] + 3 * sigma)];
+};
+// the two parameters of a 2D scan: as chosen, by default the POI (or the first parameter) and the one most correlated with it
+App.scanPair = function () {
+  const { summary: s, fit: f } = App.state;
+  const free = s.params.map((p, i) => i).filter((i) => !s.params[i].fixed);
+  if (free.length < 2) return null;
+  const x = Number(App.ui("scan.x", s.poiIndex >= 0 && free.includes(s.poiIndex) ? s.poiIndex : free[0]));
+  const k = f.inner.length;
+  const a = f.inner.indexOf(x);
+  let partner = free.find((i) => i !== x);
+  if (f.correlation && a >= 0) {
+    let best = -1;
+    f.inner.forEach((i, b) => {
+      if (b !== a && Math.abs(f.correlation[a * k + b]) > best) [best, partner] = [Math.abs(f.correlation[a * k + b]), i];
+    });
+  }
+  const y = Number(App.ui("scan.y", partner));
+  return [x, y === x ? partner : y];
 };
 App.rankingCandidates = () => App.state.fit.impacts.slice(0, Math.min(App.ui("rank.n", 15), App.state.fit.impacts.length));
 async function job(name, args, label, store) {
@@ -165,6 +186,13 @@ App.actions = {
     if (index === undefined) index = Number(App.ui("scan.index", s.poiIndex >= 0 ? s.poiIndex : s.params.findIndex((p) => !p.fixed)));
     if (lo === undefined) [lo, hi] = App.scanRange(index);
     return job("scan", { index, lo, hi, points }, "scan", (st, r) => (st.scan = r));
+  },
+  // x, y: [from, to, points] for the two parameters
+  scan2d: (indices, x, y) => {
+    if (!indices) indices = App.scanPair();
+    if (!indices) return null;
+    const range = (i, r) => r || [...App.scanRange(i), 15];
+    return job("scan2d", { indices, x: range(indices[0], x), y: range(indices[1], y) }, "scan", (st, r) => (st.scan2d = r));
   },
 };
 
@@ -229,6 +257,8 @@ function results() {
   const out = {
     workspace: App.state.name,
     measurement: s.measurement,
+    data: App.state.asimov ? "asimov" : "observed",
+    fit_seconds: f.seconds,
     twice_nll: f.twiceNll,
     converged: f.status.converged,
     parameters: s.params.map((p, i) => ({ name: p.name, value: f.pars[i], uncertainty: p.fixed || f.atBound[i] ? null : f.unc[i], fixed: p.fixed, at_bound: !!f.atBound[i] })),
@@ -307,21 +337,18 @@ App.start = function () {
   };
   $("fit").onclick = fit;
   $("cancel").onclick = () => App.engine.cancel();
-  $("measurement").onchange = (e) => {
-    const state = freshState(App.state.name, App.state.source);
-    state.measurement = Number(e.target.value);
-    state.ui = App.state.ui;
-    open(state);
+  // load the workspace again with one of the settings changed
+  const reopen = (change) => {
+    const { name, source, measurement, poiBounds, asimov, ui } = App.state;
+    open(Object.assign(freshState(name, source), { measurement, poiBounds, asimov, ui }, change));
   };
+  $("measurement").onchange = (e) => reopen({ measurement: Number(e.target.value), poiBounds: null });
+  $("dataset").onchange = (e) => reopen({ asimov: e.target.value === "asimov" });
   const rebound = () => {
     const lo = Number($("poi-lo").value);
     const hi = Number($("poi-hi").value);
     if (!(lo < hi) || $("poi-lo").value === "" || $("poi-hi").value === "") return showError("The range of the parameter of interest needs a lower bound below the upper bound.");
-    const state = freshState(App.state.name, App.state.source);
-    state.measurement = App.state.measurement;
-    state.poiBounds = [lo, hi];
-    state.ui = App.state.ui;
-    open(state);
+    reopen({ poiBounds: [lo, hi] });
   };
   $("poi-lo").onchange = rebound;
   $("poi-hi").onchange = rebound;

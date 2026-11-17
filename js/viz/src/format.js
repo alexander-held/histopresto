@@ -14,4 +14,7 @@ const yieldFmt = (v) => (!Number.isFinite(v) ? "–" : Math.abs(v) >= 1000 || Nu
 // long parameter names keep their start and end
 const short = (name, max = 44) => (name.length > max ? `${name.slice(0, max - 12)}…${name.slice(-10)}` : name);
 
-export { esc, fmt, num, yieldFmt, short };
+// confidence level as a percentage: 0.6827 -> "68.3%", 0.95 -> "95%"
+const percent = (cl) => `${Number((100 * cl).toFixed(1))}%`;
+
+export { esc, fmt, num, yieldFmt, short, percent };

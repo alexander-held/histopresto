@@ -16,7 +16,7 @@ and fit it.
 | Layer | Where | What |
 |---|---|---|
 | Core | `js/core` (`@histopresto/core`), `python` (`histopresto`) | workspace parsing, model, likelihood and gradient, minimisation, fits, scans, ranking, CLs limits, significance, yields |
-| Visualization | `js/viz` (`@histopresto/viz`) | SVG figures: pulls, correlations, ranking, data/MC, likelihood scan, CLs scan |
+| Visualization | `js/viz` (`@histopresto/viz`) | SVG figures: pulls, correlations, ranking, data/MC, likelihood scans of one and two parameters with 68.3% and 95% regions, CLs scan |
 | Website | `js/app` | static page that fits a workspace in the browser and shows all of the above |
 | Tests | `tests` | both cores against reference numbers from pyhf, and against each other |
 
@@ -48,6 +48,9 @@ model = histopresto.Model(histopresto.parse_workspace(pathlib.Path("workspace.js
 lik = model.likelihood(model.observed)
 fit = infer.fit(model, lik)                  # fit.pars, fit.unc, fit.cov, fit.twice_nll, fit.status
 limit = infer.limit(model, lik, fit)         # limit.observed, limit.expected
+scan = infer.scan(model, lik, fit, model.poi_index, infer.linspace(0, 3, 25))   # scan.intervals: 68.3% and 95%
+grid = infer.scan2d(model, lik, fit, [0, 1], infer.linspace(0, 3, 15), infer.linspace(-2, 2, 15))  # grid.twice_delta_nll[i][j]
+asimov = model.likelihood(model.expected_data(model.init))   # fit Asimov instead of observed data
 ```
 
 The kernel (`python/src/histopresto/kernel.c`) is built by scikit-build-core as a shared library and

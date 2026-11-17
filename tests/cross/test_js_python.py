@@ -2,6 +2,7 @@
 iterations, results equal up to rounding."""
 
 import json
+import math
 import pathlib
 import subprocess
 
@@ -27,6 +28,16 @@ def python_results(path):
     test = infer.tester(model, lik, base)(1.0)
     limit = infer.limit(model, lik, base)
     significance = infer.significance(model, lik, base)
+    # scans of the two parameters with the smallest index that the fit determined
+    def grid(i, n):
+        return [min(max(base.pars[i] + ((k - (n - 1) / 2) * 5 * base.unc[i]) / (n - 1), model.lower[i]), model.upper[i]) for k in range(n)]
+
+    p = int(base.inner[0])
+    scan = infer.scan(model, lik, base, p, grid(p, 11))
+    scan2d = []
+    if len(base.inner) > 1:
+        q = int(base.inner[1])
+        scan2d = [v for row in infer.scan2d(model, lik, base, [p, q], grid(p, 4), grid(q, 4)).twice_delta_nll for v in row]
     return {
         "parameters": list(model.names),
         "iterations": base.status.iterations,
@@ -37,6 +48,10 @@ def python_results(path):
         "limit": [limit.observed, *limit.expected],
         "limit_tests": len(limit.results),
         "z": [significance.z, significance.z_expected],
+        "scan": scan.twice_delta_nll,
+        "intervals": [v if math.isfinite(v) else str(v).replace("inf", "Infinity").replace("nan", "NaN") for iv in scan.intervals for r in iv.ranges for v in r],
+        "scan_unc": float(base.unc[p]),
+        "scan2d": scan2d,
     }
 
 
@@ -64,3 +79,27 @@ def test_same_results(name):
     assert worst(a["unc"], b["unc"]) < 1e-9
     for key in ["cls", "limit", "z"]:
         assert worst(a[key], b[key]) < 1e-8
+    # -2 Δln L of the scans, and the ends of the intervals in units of the uncertainty
+    for key in ["scan", "scan2d"]:
+        assert len(a[key]) == len(b[key])
+        assert worst(a[key], b[key], [1.0] * len(a[key])) < 1e-6
+    for u, v in zip(a["intervals"], b["intervals"], strict=True):
+        assert u == v if isinstance(u, str) or isinstance(v, str) else abs(u - v) < 1e-5 * a["scan_unc"]
+
+
+def test_disconnected_intervals():
+    """a signal scaled by mu^2 gives a likelihood with two minima: each confidence region is two intervals"""
+    path = REPO / "tests/cross/double_minimum.json"
+    command = ["node", str(REPO / "tests/cross/scan.mjs"), str(path), "-3", "3", "41"]
+    a = json.loads(subprocess.run(command, check=True, capture_output=True, text=True, cwd=REPO).stdout)
+    model = histopresto.Model(histopresto.parse_workspace(path.read_text()), 0)
+    lik = model.likelihood(model.observed)
+    base = infer.fit(model, lik)
+    b = [iv.ranges for iv in infer.scan(model, lik, base, model.poi_index, infer.linspace(-3, 3, 41)).intervals]
+    for js, py in zip(a, b, strict=True):
+        assert len(js) == len(py) == 2
+        assert worst([v for r in js for v in r], [v for r in py for v in r]) < 1e-5
+        # the two intervals mirror each other
+        (lo1, hi1), (lo2, hi2) = py
+        assert hi1 < 0 < lo2
+        assert abs(lo1 + hi2) < 1e-3 and abs(hi1 + lo2) < 1e-3

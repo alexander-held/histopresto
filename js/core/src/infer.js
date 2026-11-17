@@ -121,57 +121,78 @@ async function fit(model, lik, options = {}, ctx = NO_CTX) {
 
 const covAt = (base, p, q) => (base.pos[p] < 0 || base.pos[q] < 0 ? 0 : base.cov[base.pos[p] * base.inner.length + base.pos[q]]);
 
-// Fit with one parameter held at a value, starting from an earlier fit and its covariance.
+// Fit with parameters held at given values (one index and value, or arrays of them), starting from
+// an earlier fit and its covariance.
 function conditional(model, lik, base, index, value) {
-  const N = model.nPars;
-  const free = [];
-  for (const p of base.free) if (p !== index) free.push(p);
+  const held = [].concat(index);
+  const values = [].concat(value);
+  const free = Array.from(base.free).filter((p) => !held.includes(p));
   const n = free.length;
-  let C0 = base.cache.get(index);
   const k = base.inner.length;
-  const hasCov = !!base.cov;
-  const a = hasCov ? base.pos[index] : -1;
-  if (!C0) {
-    C0 = new Float64Array(n * n);
+  const key = held.join();
+  let start = base.cache.get(key);
+  if (!start) {
+    // held parameters with an entry in the covariance matrix, and the inverse of their block of it
+    let known = base.cov ? held.filter((p) => covAt(base, p, p) > 0) : [];
+    let Sinv = inverse(Float64Array.from(known.flatMap((p) => known.map((q) => covAt(base, p, q)))), known.length);
+    if (!Sinv) known = [];
+    const m = known.length;
+    const at = known.map((p) => base.pos[p]);
     const where = free.map((p) => base.pos[p]);
-    const caa = a >= 0 ? base.cov[a * k + a] : 0;
+    // gain: shift of the free parameters per unit shift of the held ones; C: covariance of the free ones given the held ones
+    const gain = new Float64Array(n * m);
+    const C = new Float64Array(n * n);
     for (let i = 0; i < n; i++) {
-      if (!hasCov || where[i] < 0) {
-        C0[i * n + i] = diagGuess(model, free[i]);
+      if (!base.cov || where[i] < 0) {
+        C[i * n + i] = diagGuess(model, free[i]);
         continue;
       }
       const ri = where[i] * k;
-      const cia = a >= 0 && caa > 0 ? base.cov[ri + a] / caa : 0;
+      for (let b = 0; b < m; b++) {
+        let t = 0;
+        for (let c = 0; c < m; c++) t += base.cov[ri + at[c]] * Sinv[c * m + b];
+        gain[i * m + b] = t;
+      }
       for (let j = 0; j < n; j++) {
         if (where[j] < 0) continue;
         let v = base.cov[ri + where[j]];
-        if (cia !== 0) v -= cia * base.cov[a * k + where[j]];
-        C0[i * n + j] = 0.5 * v;
+        for (let b = 0; b < m; b++) v -= gain[i * m + b] * base.cov[at[b] * k + where[j]];
+        C[i * n + j] = 0.5 * v;
       }
     }
-    base.cache.set(index, C0);
+    start = { C, gain, known };
+    base.cache.set(key, start);
   }
+  const hold = (x) => (held.forEach((p, c) => (x[p] = values[c])), x);
   // linear prediction of where the other parameters go
-  const x0 = Float64Array.from(base.pars);
-  x0[index] = value;
-  if (a >= 0 && base.cov[a * k + a] > 0) {
-    const shift = (value - base.pars[index]) / base.cov[a * k + a];
-    for (const p of free) {
-      if (base.pos[p] < 0) continue;
-      x0[p] = Math.min(Math.max(base.pars[p] + shift * base.cov[base.pos[p] * k + a], model.lower[p]), model.upper[p]);
-    }
+  const x0 = hold(Float64Array.from(base.pars));
+  const m = start.known.length;
+  const shift = start.known.map((p) => values[held.indexOf(p)] - base.pars[p]);
+  for (let i = 0; i < n && m > 0; i++) {
+    const p = free[i];
+    if (base.pos[p] < 0) continue;
+    let t = base.pars[p];
+    for (let b = 0; b < m; b++) t += start.gain[i * m + b] * shift[b];
+    x0[p] = Math.min(Math.max(t, model.lower[p]), model.upper[p]);
   }
-  let res = minimize(lik.value, x0, model.lower, model.upper, free, { C: C0, tol: 1e-8 });
+  let res = minimize(lik.value, x0, model.lower, model.upper, free, { C: start.C, tol: 1e-8 });
   if (!Number.isFinite(res.f)) {
     // the prediction left the region where the model is defined: start from the base fit instead
-    const x1 = Float64Array.from(base.pars);
-    x1[index] = value;
-    res = minimize(lik.value, x1, model.lower, model.upper, free, { C: C0, tol: 1e-8 });
+    res = minimize(lik.value, hold(Float64Array.from(base.pars)), model.lower, model.upper, free, { C: start.C, tol: 1e-8 });
   }
   return { pars: res.x, twiceNll: res.f, converged: res.converged };
 }
 
-// Profile likelihood scan of one parameter.
+// -2 Δln L at the edge of the 68.3% (one standard deviation) and 95% confidence regions, for one and for two parameters
+const LEVELS = {
+  1: [{ cl: 0.6827, level: 1 }, { cl: 0.95, level: 3.841458820694124 }],
+  2: [{ cl: 0.6827, level: 2.295748928898636 }, { cl: 0.95, level: 5.991464547107979 }],
+};
+
+// Profile likelihood scan of one parameter. intervals: for each confidence level {cl, level, ranges},
+// where ranges lists the [from, to] stretches of the scan below the level (more than one if the
+// likelihood has several minima), with the ends refined by further fits. An end is infinite if the
+// curve is still below the level at the end of the scan.
 async function scan(model, lik, base, index, values, ctx = NO_CTX) {
   const out = [];
   for (let i = 0; i < values.length; i++) {
@@ -180,7 +201,61 @@ async function scan(model, lik, base, index, values, ctx = NO_CTX) {
     out.push(r.twiceNll - base.twiceNll);
   }
   const iv = interval(values, out, 1);
-  return { index, values, twiceDeltaNll: out, interval: iv };
+  // measured from the fit result, or from the lowest point of the scan should that lie below it
+  const ref = Math.min(out[iv.index], 0);
+  const last = values.length - 1;
+  // where the curve crosses the level between scan point k (below it) and its neighbour (above it)
+  const crossing = (level, k, dir) => {
+    let a = [values[k], out[k] - ref];
+    let b = [values[k + dir], out[k + dir] - ref];
+    if (!Number.isFinite(b[1])) return b[0];
+    // regula falsi on the square root, which is a straight line for a parabola
+    const root = (y) => Math.sqrt(Math.max(y, 0));
+    let x = b[0];
+    for (let it = 0; it < 8; it++) {
+      x = a[0] + ((root(level) - root(a[1])) / (root(b[1]) - root(a[1]))) * (b[0] - a[0]);
+      const y = conditional(model, lik, base, index, x).twiceNll - base.twiceNll - ref;
+      if (!Number.isFinite(y) || Math.abs(y - level) < 1e-4) break;
+      if (y < level) a = [x, y];
+      else b = [x, y];
+    }
+    return x;
+  };
+  const intervals = [];
+  for (const { cl, level } of LEVELS[1]) {
+    await ctx.tick({ label: `scan of ${model.names[index]}: ${Number((100 * cl).toFixed(1))}% interval` });
+    const below = (k) => out[k] - ref < level;
+    const ranges = [];
+    for (let k = 0; k <= last; k++) {
+      if (!below(k)) continue;
+      const first = k;
+      while (k < last && below(k + 1)) k++;
+      ranges.push([first === 0 ? -Infinity : crossing(level, first, -1), k === last ? Infinity : crossing(level, k, 1)]);
+    }
+    intervals.push({ cl, level, ranges });
+  }
+  return { index, values, twiceDeltaNll: out, interval: iv, reference: ref, intervals };
+}
+
+// Profile likelihood scan of two parameters on a grid: twiceDeltaNll[i][j] for x[i], y[j].
+async function scan2d(model, lik, base, indices, x, y, ctx = NO_CTX) {
+  const z = [];
+  const total = x.length * y.length;
+  const label = `scan of ${model.names[indices[0]]} and ${model.names[indices[1]]}`;
+  let last = -Infinity;
+  for (let i = 0; i < x.length; i++) {
+    const row = [];
+    for (let j = 0; j < y.length; j++) {
+      // fits can be fast: report progress (and allow cancelling) a few times a second only
+      if (Date.now() - last > 80) {
+        await ctx.tick({ done: i * y.length + j, total, label });
+        last = Date.now();
+      }
+      row.push(conditional(model, lik, base, indices, [x[i], y[j]]).twiceNll - base.twiceNll);
+    }
+    z.push(row);
+  }
+  return { indices, x, y, twiceDeltaNll: z, levels: LEVELS[2] };
 }
 
 // Impact of each nuisance parameter on the POI as estimated from the covariance matrix.
@@ -408,4 +483,4 @@ function correlation(base) {
   return out;
 }
 
-export { fit, conditional, scan, approximateImpacts, ranking, tester, limit, significance, yields, correlation, covAt };
+export { fit, conditional, scan, scan2d, LEVELS, approximateImpacts, ranking, tester, limit, significance, yields, correlation, covAt };
