@@ -175,9 +175,12 @@ test("agreement with pyhf", async () => {
     refused("purefunc without binding", (w) => w.bindings.pop(), pure);
     refused("unsupported function", (w) => (w.bindings[1].expression = "gamma(theta)"), pure);
     refused("expression with a syntax error", (w) => (w.bindings[1].expression = "func1 + * theta"), pure);
+    // a binding that no modifier uses adds no parameters
+    pure.bindings.push({ names: ["unused"], expression: "2 * spare + func1", language: "sympy" });
+    same("unused binding: parameter names", new HF.Model(HF.parseWorkspace(pure), 0).names, reference.purefunc.par_names);
   }
   console.log(`${passed} checks passed, ${failures.length} failed`);
   for (const f of failures.slice(0, 40)) console.log("  FAIL " + f);
   assert.equal(failures.length, 0);
-  assert.equal(passed, 7369);
+  assert.equal(passed, 7370);
 });

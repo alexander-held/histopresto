@@ -82,7 +82,8 @@ change): a `purefunc` modifier names a function that a top-level `bindings` list
 ```
 
 Symbols that are not bindings become unconstrained parameters (start 1, range 0 to 10), configured
-like any other in the measurement. The expressions are parsed here, without sympy; supported are
+like any other in the measurement. Bindings that no modifier uses are ignored and add no parameters
+(pyhf adds parameters for them, which nothing depends on). The expressions are parsed here, without sympy; supported are
 numbers, `pi`, `E`, `+ - * / **`, parentheses and `sqrt exp log ln sin cos tan tanh asin acos atan sinh cosh Abs`. Bindings may
 refer to each other in any order as long as there is no cycle (pyhf only follows one level). The
 gradient is exact, by a reverse sweep over the compiled expressions.
@@ -92,7 +93,7 @@ gradient is exact, by a reverse sweep over the compiled expressions.
 `tests/reference/reference.json` holds numbers from pyhf for the workspaces in
 `tests/reference/workspaces/`: parameter order and defaults, yields, likelihood, gradient, best fit,
 uncertainties, correlations, CLs, limits and discovery significance. `tests/js` and `tests/python`
-run the same 7369 checks against it. `tests/cross` checks that the two implementations take the same
+run the same 7370 checks against it. `tests/cross` checks that the two implementations take the same
 number of iterations and agree to rounding.
 
 Regenerating the reference (`pixi run reference`) takes about five minutes, nearly all of it pyhf on

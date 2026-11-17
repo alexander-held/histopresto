@@ -111,9 +111,10 @@ def _walk(node):
         yield from _walk(child)
 
 
-def parse_bindings(bindings):
-    """bindings as in the workspace: [{names, expression, language}]
-    returns (trees: {binding name: syntax tree}, symbols: sorted names of the parameters)"""
+def parse_bindings(bindings, used):
+    """bindings as in the workspace: [{names, expression, language}]; used: names of the bindings that modifiers refer to
+    returns (trees: {binding name: syntax tree}, symbols: sorted names of the parameters), both only for the
+    bindings that are used, directly or through other bindings"""
     trees = {}
     for binding in bindings:
         names = binding["names"]
@@ -151,9 +152,11 @@ def parse_bindings(bindings):
                 symbols.add(node[1])
         state[name] = 2
 
-    for name in trees:
+    for name in used:
+        if name not in trees:
+            raise ValueError(f'The purefunc modifier "{name}" refers to a binding that is not declared.')
         follow(name)
-    return trees, sorted(symbols)
+    return {name: tree for name, tree in trees.items() if name in state}, sorted(symbols)
 
 
 def compile_bindings(trees, parameter):

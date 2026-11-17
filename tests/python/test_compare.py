@@ -202,7 +202,10 @@ def test_agreement_with_pyhf():
     refused("purefunc without binding", lambda w: w["bindings"].pop(), pure)
     refused("unsupported function", set_binding(1, "expression", "gamma(theta)"), pure)
     refused("expression with a syntax error", set_binding(1, "expression", "func1 + * theta"), pure)
+    # a binding that no modifier uses adds no parameters
+    pure["bindings"].append({"names": ["unused"], "expression": "2 * spare + func1", "language": "sympy"})
+    same("unused binding: parameter names", histopresto.Model(histopresto.parse_workspace(pure), 0).names, reference["purefunc"]["par_names"])
 
     print(f"{passed} checks passed, {len(failures)} failed")
     assert not failures, "\n".join(failures[:40])
-    assert passed == 7369
+    assert passed == 7370

@@ -79,10 +79,7 @@ class Model:
         modifiers = [modifier_keys[k] for k in sorted(modifier_keys)]
 
         # expressions of purefunc modifiers; their symbols are parameters
-        trees, symbols = parse_bindings(ws.get("bindings", []))
-        for name, type_ in modifiers:
-            if type_ == "purefunc" and name not in trees:
-                raise ValueError(f'The purefunc modifier "{name}" refers to a binding that is not declared.')
+        trees, symbols = parse_bindings(ws.get("bindings", []), [name for name, type_ in modifiers if type_ == "purefunc"])
 
         self.channels = []
         offset = 0

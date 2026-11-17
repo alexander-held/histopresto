@@ -84,9 +84,10 @@ const walk = (node, visit) => {
   else if (typeof node[0] === "number") node.slice(1).forEach((n) => walk(n, visit));
 };
 
-// bindings as in the workspace: [{names, expression, language}]
-// returns {trees: Map binding name -> syntax tree, symbols: sorted names of the parameters}
-function parseBindings(bindings) {
+// bindings as in the workspace: [{names, expression, language}]; used: names of the bindings that modifiers refer to
+// returns {trees: Map binding name -> syntax tree, symbols: sorted names of the parameters}, both only for
+// the bindings that are used, directly or through other bindings
+function parseBindings(bindings, used) {
   const trees = new Map();
   for (const binding of bindings) {
     const label = `The binding of ${binding.names.map((n) => `"${n}"`).join(", ")}`;
@@ -117,7 +118,11 @@ function parseBindings(bindings) {
     });
     state.set(name, 2);
   };
-  for (const name of trees.keys()) follow(name);
+  for (const name of used) {
+    if (!trees.has(name)) throw new Error(`The purefunc modifier "${name}" refers to a binding that is not declared.`);
+    follow(name);
+  }
+  for (const name of [...trees.keys()]) if (!state.has(name)) trees.delete(name);
   return { trees, symbols: [...symbols].sort() };
 }
 

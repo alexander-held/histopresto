@@ -43,10 +43,7 @@ function Model(ws, measurementIndex = 0, options = {}) {
   const modifiers = [...modifierKeys.keys()].sort().map((k) => modifierKeys.get(k));
 
   // expressions of purefunc modifiers; their symbols are parameters
-  const bindings = parseBindings(ws.bindings || []);
-  for (const [name, type] of modifiers) {
-    if (type === "purefunc" && !bindings.trees.has(name)) throw new Error(`The purefunc modifier "${name}" refers to a binding that is not declared.`);
-  }
+  const bindings = parseBindings(ws.bindings || [], modifiers.filter(([, type]) => type === "purefunc").map(([name]) => name));
 
   this.channels = [];
   let offset = 0;
