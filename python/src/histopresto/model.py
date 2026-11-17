@@ -307,7 +307,7 @@ class Model:
         t = {k: [] for k in ("blk_offset", "blk_n", "blk_cell", "nominal", "scal_start", "scal_count", "scal_par", "ns_start", "ns_count", "ns_par",
                              "ns_lnhi", "ns_lnlo", "ns_coef", "hs_start", "hs_count", "hs_par", "hs_data", "hs_up", "hs_dn", "gam_start", "gam_count",
                              "gam_off", "gam_idx", "fn_start", "fn_count", "fn_slot")}  # fmt: skip
-        t["tape_op"], t["tape_a"], t["tape_b"], t["tape_value"], slots, slot_pars = compile_bindings(trees, lambda name: set_by_name[name]["start"])
+        t["tape_op"], t["tape_a"], t["tape_b"], t["tape_value"], slots = compile_bindings(trees, lambda name: set_by_name[name]["start"])
         self.blocks = []
         self.channel_blocks = [[] for _ in self.channels]
         cell = 0
@@ -321,7 +321,6 @@ class Model:
                 for kind in ("scal", "ns", "hs", "gam"):
                     t[f"{kind}_start"].append(len(t["gam_off" if kind == "gam" else f"{kind}_par"]))
                 scal = []
-                fn_pars = []  # parameters the purefunc modifiers depend on
                 t["fn_start"].append(len(t["fn_slot"]))
                 for name, type_ in modifiers:
                     mod = d[1].get(f"{type_}/{name}")
@@ -329,7 +328,6 @@ class Model:
                         continue
                     if type_ == "purefunc":
                         t["fn_slot"].append(slots[name])
-                        fn_pars += slot_pars[name]
                         continue
                     start = set_by_name[name]["start"]
                     if type_ in ("normfactor", "lumi"):
@@ -359,7 +357,7 @@ class Model:
                 t["blk_n"].append(n)
                 t["blk_cell"].append(cell)
                 t["nominal"].extend(nominal)
-                block = SimpleNamespace(id=len(self.blocks), channel=ci, sample=si, offset=ch.offset, n=n, cell=cell, scal=scal, fn_pars=list(dict.fromkeys(fn_pars)))
+                block = SimpleNamespace(id=len(self.blocks), channel=ci, sample=si, offset=ch.offset, n=n, cell=cell, scal=scal)
                 self.blocks.append(block)
                 self.channel_blocks[ci].append(block)
                 cell += n

@@ -158,15 +158,14 @@ def parse_bindings(bindings):
 
 def compile_bindings(trees, parameter):
     """tape for the bindings; parameter(name) gives the index of a symbol in the parameter vector
-    returns (op, a, b, value, slots: {binding name: slot}, pars: {binding name: parameter indices it depends on})"""
-    op, a, b, value, deps = [], [], [], [], []
+    returns (op, a, b, value, slots: {binding name: slot})"""
+    op, a, b, value = [], [], [], []
 
-    def push(o, x, y, v, d):
+    def push(o, x, y=0, v=0.0):
         op.append(o)
         a.append(x)
         b.append(y)
         value.append(v)
-        deps.append(d)
         return len(op) - 1
 
     constants = {}
@@ -176,14 +175,14 @@ def compile_bindings(trees, parameter):
     def emit(node):
         if node[0] == "num":
             if node[1] not in constants:
-                constants[node[1]] = push(OP["const"], 0, 0, node[1], [])
+                constants[node[1]] = push(OP["const"], 0, 0, node[1])
             return constants[node[1]]
         if node[0] == "name":
             if node[1] in trees:
                 return binding(node[1])
             p = parameter(node[1])
             if p not in parameters:
-                parameters[p] = push(OP["par"], p, 0, 0.0, [p])
+                parameters[p] = push(OP["par"], p)
             return parameters[p]
         x = emit(node[1])
         exponent = node[2][1] if node[0] == OP["pow"] and node[2][0] == "num" else 0
@@ -191,10 +190,9 @@ def compile_bindings(trees, parameter):
             # small integer powers as products
             r = x
             for _ in range(1, int(exponent)):
-                r = push(OP["mul"], r, x, 0.0, deps[x])
+                r = push(OP["mul"], r, x)
             return r
-        y = emit(node[2]) if len(node) > 2 else 0
-        return push(node[0], x, y, 0.0, list(dict.fromkeys(deps[x] + deps[y])) if len(node) > 2 else deps[x])
+        return push(node[0], x, emit(node[2]) if len(node) > 2 else 0)
 
     def binding(name):
         if name not in slots:
@@ -203,4 +201,4 @@ def compile_bindings(trees, parameter):
 
     for name in trees:
         binding(name)
-    return op, a, b, value, slots, {name: deps[slots[name]] for name in trees}
+    return op, a, b, value, slots

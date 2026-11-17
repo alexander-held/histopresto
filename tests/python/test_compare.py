@@ -205,4 +205,4 @@ def test_agreement_with_pyhf():
 
     print(f"{passed} checks passed, {len(failures)} failed")
     assert not failures, "\n".join(failures[:40])
-    assert passed == 7318
+    assert passed == 7369

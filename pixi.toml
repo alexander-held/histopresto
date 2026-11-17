@@ -43,7 +43,7 @@ sympy = ">=1.11"
 iminuit = ">=2.33.0, <3"
 
 [feature.purefunc-ref.tasks]
-reference-purefunc = "python tests/reference/export_reference.py purefunc purefunc_mixed"
+reference-purefunc = "python tests/reference/export_reference.py purefunc purefunc_mixed purefunc_functions"
 
 [environments]
 purefunc-ref = { features = ["purefunc-ref"], no-default-feature = true }

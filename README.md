@@ -92,11 +92,11 @@ gradient is exact, by a reverse sweep over the compiled expressions.
 `tests/reference/reference.json` holds numbers from pyhf for the workspaces in
 `tests/reference/workspaces/`: parameter order and defaults, yields, likelihood, gradient, best fit,
 uncertainties, correlations, CLs, limits and discovery significance. `tests/js` and `tests/python`
-run the same 7318 checks against it. `tests/cross` checks that the two implementations take the same
+run the same 7369 checks against it. `tests/cross` checks that the two implementations take the same
 number of iterations and agree to rounding.
 
 Regenerating the reference (`pixi run reference`) takes about five minutes, nearly all of it pyhf on
-the largest workspace. It skips the two workspaces with expressions, which need pyhf from PR 2717 with
+the largest workspace. It skips the workspaces with expressions, which need pyhf from PR 2717 with
 jax: `pixi run -e purefunc-ref reference-purefunc`.
 
 ## Known limitations

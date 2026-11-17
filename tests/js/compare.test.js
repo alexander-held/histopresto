@@ -179,5 +179,5 @@ test("agreement with pyhf", async () => {
   console.log(`${passed} checks passed, ${failures.length} failed`);
   for (const f of failures.slice(0, 40)) console.log("  FAIL " + f);
   assert.equal(failures.length, 0);
-  assert.equal(passed, 7318);
+  assert.equal(passed, 7369);
 });

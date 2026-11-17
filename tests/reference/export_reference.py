@@ -177,6 +177,29 @@ def ws_purefunc():
     return spec
 
 
+def ws_purefunc_functions():
+    """every function and operator of the expressions, each on its own sample"""
+    expressions = [
+        "asin(x) + acos(x) / pi",
+        "atan(y) * sinh(x) + cosh(y) / E",
+        "tan(x) + tanh(y) + log(1 + y) + ln(2)",
+        "Abs(x - y) + 2 ** x + y ** -0.5 - -x ** 2 + 1",
+        "(sqrt(x * y) - exp(-y)) / (sin(x) + cos(y) ** 2) + 3.5e-1 * y ** 1.5",
+    ]
+    samples = [
+        {"name": f"s{k}", "data": [10.0 + 3 * k, 25.0 - 4 * k, 8.0 + k * k], "modifiers": [{"name": f"f{k}", "type": "purefunc"}]}
+        for k in range(len(expressions))
+    ]
+    spec = workspace(
+        [{"name": "SR", "samples": samples}],
+        {"SR": [130.0, 150.0, 140.0]},
+        poi="x",
+        parameters=[{"name": "x", "inits": [0.5], "bounds": [[0.2, 0.9]]}, {"name": "y", "inits": [1.5], "bounds": [[1.0, 3.0]]}],
+    )
+    spec["bindings"] = [{"names": [f"f{k}"], "expression": e, "language": "sympy"} for k, e in enumerate(expressions)]
+    return spec
+
+
 def ws_purefunc_mixed():
     """purefunc modifiers next to the standard ones; the symbol mu is also a normfactor"""
     spec = workspace(
@@ -318,6 +341,7 @@ WORKSPACES = {
     "large": (ws_random(2, 10, 8, [12, 8, 15, 10, 6, 20, 9, 14, 10, 12], 120, 80), "fit"),
     "purefunc": (ws_purefunc(), "full"),
     "purefunc_mixed": (ws_purefunc_mixed(), "full"),
+    "purefunc_functions": (ws_purefunc_functions(), "fit"),
 }
 
 
