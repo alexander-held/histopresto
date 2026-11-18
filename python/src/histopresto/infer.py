@@ -266,8 +266,8 @@ def scan(model, lik, base, index, values, neighbours=False):
 
     A fit can stop in a local minimum that the fit of a neighbouring point avoided. With neighbours,
     each point is fitted again from the solutions of its neighbours, going up and then down, and the
-    lower result is kept, which takes about twice as long. refits: number of points that
-    moved to a lower solution.
+    lower result is kept: three fits per point instead of one. refits: number of points that ended
+    lower than their first fit.
     """
 
     def lower(r, pars, value):
@@ -276,13 +276,11 @@ def scan(model, lik, base, index, values, neighbours=False):
         return t if t.twice_nll < r.twice_nll else r
 
     fits = [conditional(model, lik, base, index, v) for v in values]
-    moved = set()
+    first = [r.twice_nll for r in fits]
     for step in (1, -1) if neighbours else ():
         for i in range(1, len(values)) if step == 1 else range(len(values) - 2, -1, -1):
-            r = lower(fits[i], fits[i - step].pars, values[i])
-            if r.twice_nll < fits[i].twice_nll - 1e-6:
-                moved.add(i)
-            fits[i] = r
+            fits[i] = lower(fits[i], fits[i - step].pars, values[i])
+    refits = sum(r.twice_nll < f - 1e-6 for r, f in zip(fits, first))
     out = [r.twice_nll - base.twice_nll for r in fits]
     iv = interval(values, out, 1)
     # measured from the fit result, or from the lowest point of the scan should that lie below it
@@ -329,7 +327,7 @@ def scan(model, lik, base, index, values, neighbours=False):
                 ranges.append((-math.inf if first == 0 else crossing(lv.level, first, -1), math.inf if k == last else crossing(lv.level, k, 1)))
             k += 1
         intervals.append(SimpleNamespace(cl=lv.cl, level=lv.level, ranges=ranges))
-    return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=iv, reference=ref, intervals=intervals, refits=len(moved))
+    return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=iv, reference=ref, intervals=intervals, refits=refits)
 
 
 def scan2d(model, lik, base, indices, x, y):
