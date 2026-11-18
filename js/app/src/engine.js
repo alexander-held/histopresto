@@ -91,8 +91,8 @@ J.fit = async function (s, args, ctx) {
 J.ranking = async (s, args, ctx) => infer.ranking(s.model, s.lik, s.base, args.indices, ctx);
 J.scan = async (s, args, ctx) => {
   const watch = stopwatch(ctx);
-  const r = await infer.scan(s.model, s.lik, s.base, args.index, num.linspace(args.lo, args.hi, args.points), watch);
-  return { ...r, seconds: watch.seconds() };
+  const r = await infer.scan(s.model, s.lik, s.base, args.index, num.linspace(args.lo, args.hi, args.points), { neighbours: args.neighbours }, watch);
+  return { ...r, neighbours: args.neighbours, seconds: watch.seconds() };
 };
 J.scan2d = async (s, args, ctx) => {
   const watch = stopwatch(ctx);

@@ -122,8 +122,9 @@ async function fit(model, lik, options = {}, ctx = NO_CTX) {
 const covAt = (base, p, q) => (base.pos[p] < 0 || base.pos[q] < 0 ? 0 : base.cov[base.pos[p] * base.inner.length + base.pos[q]]);
 
 // Fit with parameters held at given values (one index and value, or arrays of them), starting from
-// an earlier fit and its covariance.
-function conditional(model, lik, base, index, value) {
+// an earlier fit and its covariance. init: parameters to start from instead of the linear prediction
+// from the covariance.
+function conditional(model, lik, base, index, value, init) {
   const held = [].concat(index);
   const values = [].concat(value);
   const free = Array.from(base.free).filter((p) => !held.includes(p));
@@ -165,8 +166,8 @@ function conditional(model, lik, base, index, value) {
   }
   const hold = (x) => (held.forEach((p, c) => (x[p] = values[c])), x);
   // linear prediction of where the other parameters go
-  const x0 = hold(Float64Array.from(base.pars));
-  const m = start.known.length;
+  const x0 = hold(Float64Array.from(init || base.pars));
+  const m = init ? 0 : start.known.length;
   const shift = start.known.map((p) => values[held.indexOf(p)] - base.pars[p]);
   for (let i = 0; i < n && m > 0; i++) {
     const p = free[i];
@@ -193,31 +194,50 @@ const LEVELS = {
 // where ranges lists the [from, to] stretches of the scan below the level (more than one if the
 // likelihood has several minima), with the ends refined by further fits. An end is infinite if the
 // curve is still below the level at the end of the scan.
-async function scan(model, lik, base, index, values, ctx = NO_CTX) {
-  const out = [];
+// A fit can stop in a local minimum that the fit of a neighbouring point avoided. With neighbours,
+// each point is fitted again from the solutions of its neighbours, going up and then down, and the
+// lower result is kept: three fits per point instead of one. refits: number of points that ended
+// lower than their first fit.
+async function scan(model, lik, base, index, values, { neighbours = false } = {}, ctx = NO_CTX) {
+  // the fit started from pars if it ends below the result r, else r
+  const lower = (r, pars, value) => {
+    const t = conditional(model, lik, base, index, value, pars);
+    return t.twiceNll < r.twiceNll ? t : r;
+  };
+  const fits = [];
   for (let i = 0; i < values.length; i++) {
     await ctx.tick({ done: i, total: values.length, label: `scan of ${model.names[index]}` });
-    const r = conditional(model, lik, base, index, values[i]);
-    out.push(r.twiceNll - base.twiceNll);
+    fits.push(conditional(model, lik, base, index, values[i]));
   }
+  const first = fits.map((r) => r.twiceNll);
+  for (const step of neighbours ? [1, -1] : []) {
+    for (let i = step === 1 ? 1 : values.length - 2; i >= 0 && i < values.length; i += step) {
+      await ctx.tick({ done: step === 1 ? i : values.length - 1 - i, total: values.length, label: `scan of ${model.names[index]}: from neighbouring points` });
+      fits[i] = lower(fits[i], fits[i - step].pars, values[i]);
+    }
+  }
+  const refits = fits.filter((r, i) => r.twiceNll < first[i] - 1e-6).length;
+  const out = fits.map((r) => r.twiceNll - base.twiceNll);
   const iv = interval(values, out, 1);
   // measured from the fit result, or from the lowest point of the scan should that lie below it
   const ref = Math.min(out[iv.index], 0);
   const last = values.length - 1;
   // where the curve crosses the level between scan point k (below it) and its neighbour (above it)
   const crossing = (level, k, dir) => {
-    let a = [values[k], out[k] - ref];
-    let b = [values[k + dir], out[k + dir] - ref];
+    let a = [values[k], out[k] - ref, fits[k].pars];
+    let b = [values[k + dir], out[k + dir] - ref, fits[k + dir].pars];
     if (!Number.isFinite(b[1])) return b[0];
     // regula falsi on the square root, which is a straight line for a parabola
     const root = (y) => Math.sqrt(Math.max(y, 0));
     let x = b[0];
     for (let it = 0; it < 8; it++) {
       x = a[0] + ((root(level) - root(a[1])) / (root(b[1]) - root(a[1]))) * (b[0] - a[0]);
-      const y = conditional(model, lik, base, index, x).twiceNll - base.twiceNll - ref;
+      // from the solutions at both ends, which may be different minima
+      const r = neighbours ? lower(conditional(model, lik, base, index, x, a[2]), b[2], x) : conditional(model, lik, base, index, x);
+      const y = r.twiceNll - base.twiceNll - ref;
       if (!Number.isFinite(y) || Math.abs(y - level) < 1e-4) break;
-      if (y < level) a = [x, y];
-      else b = [x, y];
+      if (y < level) a = [x, y, r.pars];
+      else b = [x, y, r.pars];
     }
     return x;
   };
@@ -234,7 +254,7 @@ async function scan(model, lik, base, index, values, ctx = NO_CTX) {
     }
     intervals.push({ cl, level, ranges });
   }
-  return { index, values, twiceDeltaNll: out, interval: iv, reference: ref, intervals };
+  return { index, values, twiceDeltaNll: out, interval: iv, reference: ref, intervals, refits };
 }
 
 // Profile likelihood scan of two parameters on a grid: twiceDeltaNll[i][j] for x[i], y[j].

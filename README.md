@@ -112,6 +112,11 @@ jax: `pixi run -e purefunc-ref reference-purefunc`.
   call per parameter.
 - `infer.conditional` (used by scans, ranking, limits and significance) has no final Newton step, so
   on models with several hundred parameters it can stop slightly above the minimum.
+- A scan point can stop in a local minimum when the likelihood has several. `infer.scan(..., neighbours=True)`
+  (JS: `{ neighbours: true }`, app: "refit from neighbours") fits each point again from its neighbours'
+  solutions and keeps the lower result, at three fits per point instead of one. It only finds a
+  minimum that some point of the scan reached, so the result can depend on the scan range. `scan2d`
+  has no such option.
 - The dense BFGS update dominates above a few hundred parameters.
 - Out of scope: patchsets, toy-based limits, XML/ROOT input. Bins have no physical edges.
 

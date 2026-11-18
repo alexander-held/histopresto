@@ -67,12 +67,13 @@ function renderScan1d(container, state) {
         `<label>from <input id="scan-lo" type="number" step="any" value="${rounded(lo)}"></label>` +
         `<label>to <input id="scan-hi" type="number" step="any" value="${rounded(hi)}"></label>` +
         `<label>points <input id="scan-n" type="number" min="5" max="201" step="1" value="${done ? done.values.length : 25}"></label>` +
+        `<label title="Fit each point again from the solutions of its neighbours and keep the lower result. Slower, for likelihoods with several minima."><input id="scan-neighbours" type="checkbox"${(done ? done.neighbours : App.ui("scan.neighbours", false)) ? " checked" : ""}> refit from neighbours</label>` +
         `<button id="scan-run" class="primary" data-job>Scan</button>`
     ) +
     (done ? `<div class="figure" id="scan-figure" style="max-width: 760px"></div><div id="scan-text"></div>` : `<p class="empty">The scan fixes ${esc(p.name)} at each value in turn and minimises over all other parameters.</p>`);
   container.querySelector("#scan-run").onclick = () => {
     const [a, b, n] = inputs(container, "scan-lo", "scan-hi", "scan-n");
-    if (a < b && Math.round(n) >= 3) App.actions.scan(index, a, b, Math.round(n));
+    if (a < b && Math.round(n) >= 3) App.actions.scan(index, a, b, Math.round(n), container.querySelector("#scan-neighbours").checked);
   };
   if (!done) return;
 
@@ -99,7 +100,7 @@ function renderScan1d(container, state) {
     (split ? ` The likelihood has more than one minimum in the scanned range, so a confidence region can consist of several separate intervals; each is listed on its own row.` : "") +
     (openEnded ? ` A <b>?</b> marks an end outside the scanned range.` : "") +
     lowerPoint(-done.reference) +
-    ` ${done.values.length} scan points in ${App.duration(done.seconds)}.</p>`;
+    ` ${done.values.length} scan points in ${App.duration(done.seconds)}${done.neighbours ? `, ${done.refits} of them lower when refitted from a neighbour` : ""}.</p>`;
 }
 
 function renderScan2d(container, state) {

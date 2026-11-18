@@ -199,9 +199,10 @@ def cov_at(base, p, q):
     return 0.0 if base.pos[p] < 0 or base.pos[q] < 0 else base.cov[base.pos[p], base.pos[q]]
 
 
-def conditional(model, lik, base, index, value):
+def conditional(model, lik, base, index, value, init=None):
     """Fit with parameters held at given values (one index and value, or sequences of them), starting
-    from an earlier fit and its covariance."""
+    from an earlier fit and its covariance. init: parameters to start from instead of the linear
+    prediction from the covariance."""
     held = np.atleast_1d(np.asarray(index, dtype=np.int32))
     values = np.atleast_1d(np.asarray(value, dtype=np.float64))
     free = base.free[~np.isin(base.free, held)]
@@ -233,9 +234,9 @@ def conditional(model, lik, base, index, value):
         start = SimpleNamespace(C=C, gain=gain, known=known, moved=free[inside])
         base.cache[key] = start
     # linear prediction of where the other parameters go
-    x0 = base.pars.copy()
+    x0 = (base.pars if init is None else init).copy()
     x0[held] = values
-    if start.known:
+    if init is None and start.known:
         shift = np.array([values[key.index(p)] - base.pars[p] for p in start.known])
         p = start.moved
         x0[p] = np.minimum(np.maximum(base.pars[p] + start.gain @ shift, model.lower[p]), model.upper[p])
@@ -255,15 +256,32 @@ LEVELS = {
 }
 
 
-def scan(model, lik, base, index, values):
+def scan(model, lik, base, index, values, neighbours=False):
     """Profile likelihood scan of one parameter.
 
     intervals: for each confidence level (cl, level, ranges), where ranges lists the (from, to)
     stretches of the scan below the level (more than one if the likelihood has several minima), with
     the ends refined by further fits. An end is infinite if the curve is still below the level at the
     end of the scan.
+
+    A fit can stop in a local minimum that the fit of a neighbouring point avoided. With neighbours,
+    each point is fitted again from the solutions of its neighbours, going up and then down, and the
+    lower result is kept: three fits per point instead of one. refits: number of points that ended
+    lower than their first fit.
     """
-    out = [conditional(model, lik, base, index, v).twice_nll - base.twice_nll for v in values]
+
+    def lower(r, pars, value):
+        """the fit started from pars if it ends below the result r, else r"""
+        t = conditional(model, lik, base, index, value, init=pars)
+        return t if t.twice_nll < r.twice_nll else r
+
+    fits = [conditional(model, lik, base, index, v) for v in values]
+    first = [r.twice_nll for r in fits]
+    for step in (1, -1) if neighbours else ():
+        for i in range(1, len(values)) if step == 1 else range(len(values) - 2, -1, -1):
+            fits[i] = lower(fits[i], fits[i - step].pars, values[i])
+    refits = sum(r.twice_nll < f - 1e-6 for r, f in zip(fits, first))
+    out = [r.twice_nll - base.twice_nll for r in fits]
     iv = interval(values, out, 1)
     # measured from the fit result, or from the lowest point of the scan should that lie below it
     ref = min(out[iv.index], 0.0)
@@ -274,21 +292,26 @@ def scan(model, lik, base, index, values):
 
     def crossing(level, k, step):
         """where the curve crosses the level between scan point k (below it) and its neighbour (above it)"""
-        a = (values[k], out[k] - ref)
-        b = (values[k + step], out[k + step] - ref)
+        a = (values[k], out[k] - ref, fits[k].pars)
+        b = (values[k + step], out[k + step] - ref, fits[k + step].pars)
         if not math.isfinite(b[1]):
             return b[0]
         # regula falsi on the square root, which is a straight line for a parabola
         x = b[0]
         for _ in range(8):
             x = a[0] + ((root(level) - root(a[1])) / (root(b[1]) - root(a[1]))) * (b[0] - a[0])
-            y = conditional(model, lik, base, index, x).twice_nll - base.twice_nll - ref
+            # from the solutions at both ends, which may be different minima
+            if neighbours:
+                r = lower(conditional(model, lik, base, index, x, init=a[2]), b[2], x)
+            else:
+                r = conditional(model, lik, base, index, x)
+            y = r.twice_nll - base.twice_nll - ref
             if not math.isfinite(y) or abs(y - level) < 1e-4:
                 break
             if y < level:
-                a = (x, y)
+                a = (x, y, r.pars)
             else:
-                b = (x, y)
+                b = (x, y, r.pars)
         return x
 
     intervals = []
@@ -304,7 +327,7 @@ def scan(model, lik, base, index, values):
                 ranges.append((-math.inf if first == 0 else crossing(lv.level, first, -1), math.inf if k == last else crossing(lv.level, k, 1)))
             k += 1
         intervals.append(SimpleNamespace(cl=lv.cl, level=lv.level, ranges=ranges))
-    return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=iv, reference=ref, intervals=intervals)
+    return SimpleNamespace(index=index, values=values, twice_delta_nll=out, interval=iv, reference=ref, intervals=intervals, refits=refits)
 
 
 def scan2d(model, lik, base, indices, x, y):
