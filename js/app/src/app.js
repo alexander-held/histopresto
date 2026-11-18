@@ -181,11 +181,11 @@ App.actions = {
     job("ranking", { indices: indices || App.rankingCandidates().map((r) => r.index).filter((i) => !App.state.exact.has(i)) }, "ranking", (st, r) => {
       for (const row of r) st.exact.set(row.index, row);
     }),
-  scan: (index, lo, hi, points = 25) => {
+  scan: (index, lo, hi, points = 25, neighbours = Boolean(App.ui("scan.neighbours", false))) => {
     const s = App.state.summary;
     if (index === undefined) index = Number(App.ui("scan.index", s.poiIndex >= 0 ? s.poiIndex : s.params.findIndex((p) => !p.fixed)));
     if (lo === undefined) [lo, hi] = App.scanRange(index);
-    return job("scan", { index, lo, hi, points }, "scan", (st, r) => (st.scan = r));
+    return job("scan", { index, lo, hi, points, neighbours }, "scan", (st, r) => (st.scan = r));
   },
   // x, y: [from, to, points] for the two parameters
   scan2d: (indices, x, y) => {
