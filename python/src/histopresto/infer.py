@@ -64,11 +64,11 @@ def minimize(lik, x0, free, C=None, diag=None, tol=1e-7, max_iter=0):
     return SimpleNamespace(x=x, f=f.value, g=g, C=C_out, edm=edm.value, converged=bool(converged), iterations=iterations.value, active=active)
 
 
-def hessian(lik, x, idx, steps, central):
-    """second derivatives of lik with respect to the parameters in idx, from differences of the gradient"""
+def hessian(lik, x, idx, steps):
+    """second derivatives of lik with respect to the parameters in idx, from central differences of the gradient"""
     k = len(idx)
     H = np.empty((k, k))
-    _lib.hf_hessian(lik.model._ref, lik._data, lik.constant, x.ctypes.data, idx.ctypes.data, k, steps.ctypes.data, int(central), H.ctypes.data)
+    _lib.hf_hessian(lik.model._ref, lik._data, lik.constant, x.ctypes.data, idx.ctypes.data, k, steps.ctypes.data, H.ctypes.data)
     return H
 
 
@@ -114,12 +114,9 @@ def fit(model, lik, init=None, fixed=None):
     n = len(free)
     x0[free] = np.minimum(np.maximum(x0[free], model.lower[free]), model.upper[free])
 
-    # start from the curvature at the initial point
-    diag = _diag_guess(model, free)
-    C0 = None
-    if n > 0 and math.isfinite(lik.value(x0, np.empty(N))):
-        C0 = _chol_inverse(hessian(lik, x0, free, _step_size(model, x0, free), False))
-    res = minimize(lik, x0, free, C=C0, diag=diag, tol=1e-6)
+    # start from the constraint widths: the second derivatives at the initial point are rarely positive definite
+    # and cost more likelihood calls than they save
+    res = minimize(lik, x0, free, diag=_diag_guess(model, free), tol=1e-6)
     x = res.x
     f = res.f
 
@@ -137,7 +134,7 @@ def fit(model, lik, init=None, fixed=None):
         at_bound[free[stuck]] = 1
         inner = free[~stuck]
         k = len(inner)
-        H = hessian(lik, x, inner, _step_size(model, x, inner), True)
+        H = hessian(lik, x, inner, _step_size(model, x, inner))
         Hinv = _chol_inverse(H)
         pos_def = Hinv is not None
         if not pos_def:
@@ -399,7 +396,7 @@ def tester(model, lik, base):
         clb = norm_sf(ts)
         return SimpleNamespace(
             mu=mu,
-            cls=clsb / clb,
+            cls=clsb / clb if clb > 0 else math.nan,  # both underflow to zero far above the limit
             clsb=clsb,
             clb=clb,
             expected=[norm_sf(nsig + root_a) / norm_sf(nsig) for nsig in (2, 1, 0, -1, -2)],
@@ -486,7 +483,8 @@ def significance(model, lik, base):
 def yields(model, pars, base=None):
     """Yields per channel, sample and bin with uncertainties from linear error propagation.
 
-    Without a fit result the pre-fit uncertainties of the constraint terms are used.
+    Without a fit result the pre-fit uncertainties of the constraint terms are used. The uncertainties
+    are NaN if the fit has no covariance matrix.
     """
     pars = np.ascontiguousarray(pars, dtype=np.float64)
     grad = np.zeros(model.n_pars)
@@ -504,6 +502,8 @@ def yields(model, pars, base=None):
         model.accumulate(pars, grad, np.array([blk.id for blk in blocks], dtype=np.int32))
         if base is None:
             return math.sqrt(float(np.sum(np.square(grad[floating] * model.prefit_unc[floating]))))
+        if base.cov is None:
+            return math.nan
         gi = grad[base.inner]
         return math.sqrt(max(float(gi @ base.cov @ gi), 0))
 

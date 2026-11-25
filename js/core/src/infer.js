@@ -25,17 +25,11 @@ async function fit(model, lik, options = {}, ctx = NO_CTX) {
   const n = free.length;
   for (const p of free) x0[p] = Math.min(Math.max(x0[p], model.lower[p]), model.upper[p]);
 
-  // start from the curvature at the initial point
-  await ctx.tick({ label: "second derivatives at the starting point" });
-  const diag = Float64Array.from(free, (p) => diagGuess(model, p));
-  let C0 = null;
-  if (n > 0 && Number.isFinite(fg(x0, new Float64Array(N)))) {
-    const H0 = hessian(fg, x0, free, free.map((p) => stepSize(model, x0, p)), false);
-    const L0 = cholesky(H0, n);
-    if (L0) C0 = cholInverse(L0, n);
-  }
+  // start from the constraint widths: the second derivatives at the initial point are rarely positive definite
+  // and cost more likelihood calls than they save
   await ctx.tick({ label: "minimising" });
-  const res = minimize(fg, x0, model.lower, model.upper, free, { C: C0, diag, tol: 1e-6 });
+  const diag = Float64Array.from(free, (p) => diagGuess(model, p));
+  const res = minimize(fg, x0, model.lower, model.upper, free, { diag, tol: 1e-6 });
   let x = res.x;
   let f = res.f;
 
@@ -56,7 +50,7 @@ async function fit(model, lik, options = {}, ctx = NO_CTX) {
       else inner.push(p);
     }
     const k = inner.length;
-    const H = hessian(fg, x, inner, inner.map((p) => stepSize(model, x, p)), true);
+    const H = hessian(fg, x, inner, inner.map((p) => stepSize(model, x, p)));
     const L = cholesky(H, k);
     posDef = !!L;
     const Hinv = L ? cholInverse(L, k) : inverse(H, k);
@@ -437,7 +431,8 @@ async function significance(model, lik, base, ctx = NO_CTX) {
 }
 
 // Yields per channel, sample and bin with uncertainties from linear error propagation.
-// Without a fit result the pre-fit uncertainties of the constraint terms are used.
+// Without a fit result the pre-fit uncertainties of the constraint terms are used. The uncertainties are NaN if
+// the fit has no covariance matrix.
 function yields(model, pars, base) {
   const N = model.nPars;
   const grad = new Float64Array(N);
@@ -448,6 +443,7 @@ function yields(model, pars, base) {
       for (let p = 0; p < N; p++) if (!model.fixed[p] && grad[p] !== 0) v += (grad[p] * model.prefitUnc[p]) ** 2;
       return v;
     }
+    if (!base.cov) return NaN;
     const nz = [];
     for (let a = 0; a < k; a++) if (grad[base.inner[a]] !== 0) nz.push(a);
     for (const a of nz) {

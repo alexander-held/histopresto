@@ -12,7 +12,9 @@ function drawYields(container, ch, layers, { mode = "post", logy = false, wide =
   const edges = Array.from({ length: n + 1 }, (_, i) => i);
   const centres = Array.from({ length: n }, (_, i) => i + 0.5);
   const err = ch.data.map((v) => Math.sqrt(v));
-  const top = Math.max(...ch.total.map((v, b) => v + ch.totalUnc[b]), ...ch.data.map((v, b) => v + err[b]));
+  // no band where the uncertainty is unknown (a fit without covariance matrix)
+  const unc = ch.totalUnc.map((u) => (Number.isFinite(u) ? u : 0));
+  const top = Math.max(...ch.total.map((v, b) => v + unc[b]), ...ch.data.map((v, b) => v + err[b]));
   const positive = ch.total.filter((v) => v > 0);
   const low = logy ? Math.pow(10, Math.floor(Math.log10(Math.max(Math.min(...positive, ...ch.data.filter((v) => v > 0)) / 3, 1e-3)))) : 0;
   const stride = Math.ceil(n / (wide ? 20 : 10));
@@ -38,13 +40,13 @@ function drawYields(container, ch, layers, { mode = "post", logy = false, wide =
     cumulative.push({ l, base, top: running.slice() });
   }
   for (const { l, base, top: t } of cumulative.slice().reverse()) a.steps(edges, t, { fill: true, color: l.colour, baseline: base, label: l.name });
-  a.steps(edges, ch.total.map((v, b) => v + ch.totalUnc[b]), { fill: true, hatch: true, color: "var(--ink-2)", baseline: ch.total.map((v, b) => Math.max(v - ch.totalUnc[b], low)), label: "uncertainty" });
+  a.steps(edges, ch.total.map((v, b) => v + unc[b]), { fill: true, hatch: true, color: "var(--ink-2)", baseline: ch.total.map((v, b) => Math.max(v - unc[b], low)), label: "uncertainty" });
   a.points(centres, ch.data.map((v) => (logy && v <= 0 ? NaN : v)), { color: "var(--ink)", size: 3.5, yerr: [ch.data.map((v, b) => (logy ? Math.min(err[b], v - low) : err[b])), err], errWidth: 1.5, stroke: "var(--plot-bg)", strokeWidth: 1, label: "data" });
   a.legend();
 
   const ratio = ch.data.map((v, b) => (ch.total[b] > 0 ? v / ch.total[b] : NaN));
   const ratioErr = err.map((e, b) => (ch.total[b] > 0 ? e / ch.total[b] : 0));
-  const band = ch.totalUnc.map((u, b) => (ch.total[b] > 0 ? u / ch.total[b] : 0));
+  const band = unc.map((u, b) => (ch.total[b] > 0 ? u / ch.total[b] : 0));
   const worst = Math.max(...ratio.map((r, b) => (Number.isFinite(r) ? Math.abs(r - 1) + ratioErr[b] : 0)), ...band);
   const span = Math.min(Math.max(1.15 * worst, 0.1), 1);
   const r = fig.axes({

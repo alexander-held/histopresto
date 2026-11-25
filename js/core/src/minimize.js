@@ -1,4 +1,4 @@
-// Quasi-Newton minimisation with box bounds, and second derivatives from finite differences of the gradient.
+// Quasi-Newton minimisation with box bounds, and second derivatives from central differences of the gradient.
 import { inverse } from "./numerics.js";
 
 // fg(x, grad) returns the function value and fills the gradient (both over all parameters).
@@ -111,7 +111,7 @@ function minimize(fg, x0, lower, upper, free, options = {}) {
         const p = free[i];
         const v = Math.min(Math.max(x[p] - t * u[i], lower[p]), upper[p]);
         xn[p] = v;
-        predicted += g[p] * (v - x[p]);
+        if (v !== x[p]) predicted += g[p] * (v - x[p]);
       }
       fn = fg(xn, gn);
       if (Number.isFinite(fn) && fn <= f + 1e-4 * predicted) {
@@ -164,8 +164,9 @@ function minimize(fg, x0, lower, upper, free, options = {}) {
   return { x, f, g, C, edm, converged, iterations: iter, active };
 }
 
-// second derivatives of f with respect to the parameters in idx, from differences of the gradient
-function hessian(fg, x, idx, steps, central) {
+// second derivatives of f with respect to the parameters in idx, from central differences of the gradient
+// (one-sided where f is not defined on the other side)
+function hessian(fg, x, idx, steps) {
   const N = x.length;
   const k = idx.length;
   const H = new Float64Array(k * k);
@@ -173,19 +174,15 @@ function hessian(fg, x, idx, steps, central) {
   const g0 = new Float64Array(N);
   const gp = new Float64Array(N);
   const gm = new Float64Array(N);
-  if (!central) fg(xp, g0);
   for (let a = 0; a < k; a++) {
     const p = idx[a];
     const h = steps[a];
     xp[p] = x[p] + h;
     const up = Number.isFinite(fg(xp, gp));
-    let down = false;
-    if (central || !up) {
-      xp[p] = x[p] - h;
-      down = Number.isFinite(fg(xp, gm));
-    }
+    xp[p] = x[p] - h;
+    const down = Number.isFinite(fg(xp, gm));
     xp[p] = x[p];
-    if ((!up || !down) && central) fg(xp, g0);
+    if (!up || !down) fg(xp, g0);
     for (let b = 0; b < k; b++) {
       const q = idx[b];
       if (up && down) H[a * k + b] = (gp[q] - gm[q]) / (2 * h);

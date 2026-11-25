@@ -49,5 +49,5 @@ lib.hf_nll.argtypes = [PTR, PTR, F64, PTR, PTR]
 lib.hf_nll.restype = F64
 lib.hf_minimize.argtypes = [PTR, PTR, F64, PTR, PTR, PTR, PTR, ctypes.c_int, PTR, PTR, F64, ctypes.c_int, PTR, PTR, PTR, PTR, PTR, PTR, PTR]
 lib.hf_minimize.restype = ctypes.c_int
-lib.hf_hessian.argtypes = [PTR, PTR, F64, PTR, PTR, ctypes.c_int, PTR, ctypes.c_int, PTR]
+lib.hf_hessian.argtypes = [PTR, PTR, F64, PTR, PTR, ctypes.c_int, PTR, PTR]
 lib.hf_hessian.restype = None
