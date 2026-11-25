@@ -103,3 +103,21 @@ def test_disconnected_intervals():
         (lo1, hi1), (lo2, hi2) = py
         assert hi1 < 0 < lo2
         assert abs(lo1 + hi2) < 1e-3 and abs(hi1 + lo2) < 1e-3
+
+
+def test_infinite_gradient_at_bound():
+    """sqrt(theta) has an infinite gradient at theta = 0: a fit started there has to leave the bound"""
+    path = REPO / "tests/reference/workspaces/purefunc.json"
+    model = histopresto.Model(histopresto.parse_workspace(path.read_text()), 0)
+    lik = model.likelihood(model.observed)
+    init = list(model.init)
+    init[model.names.index("theta")] = 0.0
+    command = ["node", str(REPO / "tests/cross/fit.mjs"), str(path), json.dumps(init)]
+    a = json.loads(subprocess.run(command, check=True, capture_output=True, text=True, cwd=REPO).stdout)
+    b = infer.fit(model, lik, init=init)
+    best = infer.fit(model, lik)
+    assert a["converged"] and b.status.converged
+    assert a["iterations"] == b.status.iterations
+    assert abs(a["twice_nll"] - b.twice_nll) < 1e-9
+    assert abs(b.twice_nll - best.twice_nll) < 1e-6
+    assert worst(a["pars"], b.pars.tolist()) < 1e-6

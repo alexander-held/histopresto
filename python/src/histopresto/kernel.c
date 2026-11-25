@@ -472,7 +472,7 @@ int hf_minimize(hf_model *m, const double *data, double constant, const double *
           const int p = free_idx[i];
           const double v = clamp(x[p] - t * u[i], lower[p], upper[p]);
           xn[p] = v;
-          predicted += g[p] * (v - x[p]);
+          if (v != x[p]) predicted += g[p] * (v - x[p]);
         }
         fn = hf_nll(m, data, constant, xn, gn);
         if (isfinite(fn) && fn <= f + 1e-4 * predicted) {

@@ -111,7 +111,7 @@ function minimize(fg, x0, lower, upper, free, options = {}) {
         const p = free[i];
         const v = Math.min(Math.max(x[p] - t * u[i], lower[p]), upper[p]);
         xn[p] = v;
-        predicted += g[p] * (v - x[p]);
+        if (v !== x[p]) predicted += g[p] * (v - x[p]);
       }
       fn = fg(xn, gn);
       if (Number.isFinite(fn) && fn <= f + 1e-4 * predicted) {
