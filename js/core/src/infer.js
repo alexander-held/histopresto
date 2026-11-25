@@ -431,7 +431,8 @@ async function significance(model, lik, base, ctx = NO_CTX) {
 }
 
 // Yields per channel, sample and bin with uncertainties from linear error propagation.
-// Without a fit result the pre-fit uncertainties of the constraint terms are used.
+// Without a fit result the pre-fit uncertainties of the constraint terms are used. The uncertainties are NaN if
+// the fit has no covariance matrix.
 function yields(model, pars, base) {
   const N = model.nPars;
   const grad = new Float64Array(N);
@@ -442,6 +443,7 @@ function yields(model, pars, base) {
       for (let p = 0; p < N; p++) if (!model.fixed[p] && grad[p] !== 0) v += (grad[p] * model.prefitUnc[p]) ** 2;
       return v;
     }
+    if (!base.cov) return NaN;
     const nz = [];
     for (let a = 0; a < k; a++) if (grad[base.inner[a]] !== 0) nz.push(a);
     for (const a of nz) {

@@ -19,6 +19,13 @@ def norm_sf(x):
     return 0.5 * math.erfc(x / math.sqrt(2))
 
 
+def _ratio(a, b):
+    """a / b as floating-point division does it, without raising when b is zero"""
+    if b != 0:
+        return a / b
+    return math.nan if a == 0 or math.isnan(a) else math.copysign(math.inf, a)
+
+
 def linspace(a, b, n):
     return [a if n == 1 else a + ((b - a) * i) / (n - 1) for i in range(n)]
 
@@ -396,7 +403,7 @@ def tester(model, lik, base):
         clb = norm_sf(ts)
         return SimpleNamespace(
             mu=mu,
-            cls=clsb / clb,
+            cls=_ratio(clsb, clb),  # both underflow to zero far above the limit
             clsb=clsb,
             clb=clb,
             expected=[norm_sf(nsig + root_a) / norm_sf(nsig) for nsig in (2, 1, 0, -1, -2)],
@@ -483,7 +490,8 @@ def significance(model, lik, base):
 def yields(model, pars, base=None):
     """Yields per channel, sample and bin with uncertainties from linear error propagation.
 
-    Without a fit result the pre-fit uncertainties of the constraint terms are used.
+    Without a fit result the pre-fit uncertainties of the constraint terms are used. The uncertainties
+    are NaN if the fit has no covariance matrix.
     """
     pars = np.ascontiguousarray(pars, dtype=np.float64)
     grad = np.zeros(model.n_pars)
@@ -501,6 +509,8 @@ def yields(model, pars, base=None):
         model.accumulate(pars, grad, np.array([blk.id for blk in blocks], dtype=np.int32))
         if base is None:
             return math.sqrt(float(np.sum(np.square(grad[floating] * model.prefit_unc[floating]))))
+        if base.cov is None:
+            return math.nan
         gi = grad[base.inner]
         return math.sqrt(max(float(gi @ base.cov @ gi), 0))
 
