@@ -19,13 +19,6 @@ def norm_sf(x):
     return 0.5 * math.erfc(x / math.sqrt(2))
 
 
-def _ratio(a, b):
-    """a / b as floating-point division does it, without raising when b is zero"""
-    if b != 0:
-        return a / b
-    return math.nan if a == 0 or math.isnan(a) else math.copysign(math.inf, a)
-
-
 def linspace(a, b, n):
     return [a if n == 1 else a + ((b - a) * i) / (n - 1) for i in range(n)]
 
@@ -71,11 +64,11 @@ def minimize(lik, x0, free, C=None, diag=None, tol=1e-7, max_iter=0):
     return SimpleNamespace(x=x, f=f.value, g=g, C=C_out, edm=edm.value, converged=bool(converged), iterations=iterations.value, active=active)
 
 
-def hessian(lik, x, idx, steps, central):
-    """second derivatives of lik with respect to the parameters in idx, from differences of the gradient"""
+def hessian(lik, x, idx, steps):
+    """second derivatives of lik with respect to the parameters in idx, from central differences of the gradient"""
     k = len(idx)
     H = np.empty((k, k))
-    _lib.hf_hessian(lik.model._ref, lik._data, lik.constant, x.ctypes.data, idx.ctypes.data, k, steps.ctypes.data, int(central), H.ctypes.data)
+    _lib.hf_hessian(lik.model._ref, lik._data, lik.constant, x.ctypes.data, idx.ctypes.data, k, steps.ctypes.data, H.ctypes.data)
     return H
 
 
@@ -141,7 +134,7 @@ def fit(model, lik, init=None, fixed=None):
         at_bound[free[stuck]] = 1
         inner = free[~stuck]
         k = len(inner)
-        H = hessian(lik, x, inner, _step_size(model, x, inner), True)
+        H = hessian(lik, x, inner, _step_size(model, x, inner))
         Hinv = _chol_inverse(H)
         pos_def = Hinv is not None
         if not pos_def:
@@ -403,7 +396,7 @@ def tester(model, lik, base):
         clb = norm_sf(ts)
         return SimpleNamespace(
             mu=mu,
-            cls=_ratio(clsb, clb),  # both underflow to zero far above the limit
+            cls=clsb / clb if clb > 0 else math.nan,  # both underflow to zero far above the limit
             clsb=clsb,
             clb=clb,
             expected=[norm_sf(nsig + root_a) / norm_sf(nsig) for nsig in (2, 1, 0, -1, -2)],

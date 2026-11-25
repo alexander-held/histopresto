@@ -50,7 +50,7 @@ async function fit(model, lik, options = {}, ctx = NO_CTX) {
       else inner.push(p);
     }
     const k = inner.length;
-    const H = hessian(fg, x, inner, inner.map((p) => stepSize(model, x, p)), true);
+    const H = hessian(fg, x, inner, inner.map((p) => stepSize(model, x, p)));
     const L = cholesky(H, k);
     posDef = !!L;
     const Hinv = L ? cholInverse(L, k) : inverse(H, k);

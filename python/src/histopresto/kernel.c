@@ -534,26 +534,23 @@ int hf_minimize(hf_model *m, const double *data, double constant, const double *
   return converged;
 }
 
-// second derivatives of -2 ln L with respect to the k parameters in idx, from differences of the gradient
+// second derivatives of -2 ln L with respect to the k parameters in idx, from central differences of the gradient
+// (one-sided where the model is not defined on the other side)
 void hf_hessian(hf_model *m, const double *data, double constant, const double *x, const int32_t *idx, int k,
-                const double *steps, int central, double *H) {
+                const double *steps, double *H) {
   const int N = m->n_pars;
   double *buf = (double *)calloc(4 * (size_t)N + 1, sizeof(double));
   double *xp = buf, *g0 = xp + N, *gp = g0 + N, *gm = gp + N;
   memcpy(xp, x, sizeof(double) * (size_t)N);
-  if (!central) hf_nll(m, data, constant, xp, g0);
   for (int a = 0; a < k; a++) {
     const int p = idx[a];
     const double h = steps[a];
     xp[p] = x[p] + h;
     const int up = isfinite(hf_nll(m, data, constant, xp, gp));
-    int down = 0;
-    if (central || !up) {
-      xp[p] = x[p] - h;
-      down = isfinite(hf_nll(m, data, constant, xp, gm));
-    }
+    xp[p] = x[p] - h;
+    const int down = isfinite(hf_nll(m, data, constant, xp, gm));
     xp[p] = x[p];
-    if ((!up || !down) && central) hf_nll(m, data, constant, xp, g0);
+    if (!up || !down) hf_nll(m, data, constant, xp, g0);
     double *row = H + (size_t)a * k;
     for (int b = 0; b < k; b++) {
       const int q = idx[b];
