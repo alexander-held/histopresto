@@ -107,9 +107,6 @@ jax: `pixi run -e purefunc-ref reference-purefunc`.
 
 - Models with flat directions: when the covariance matrix is not positive definite the fit is
   reported as not converged, and uncertainties, ranking and bands are unreliable.
-- `infer.fit` computes a Hessian at the starting point to seed the minimiser, which is discarded
-  whenever it is not positive definite (the case on all larger models tried). It costs one gradient
-  call per parameter.
 - `infer.conditional` (used by scans, ranking, limits and significance) has no final Newton step, so
   on models with several hundred parameters it can stop slightly above the minimum.
 - A scan point can stop in a local minimum when the likelihood has several. `infer.scan(..., neighbours=True)`

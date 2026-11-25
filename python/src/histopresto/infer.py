@@ -114,12 +114,9 @@ def fit(model, lik, init=None, fixed=None):
     n = len(free)
     x0[free] = np.minimum(np.maximum(x0[free], model.lower[free]), model.upper[free])
 
-    # start from the curvature at the initial point
-    diag = _diag_guess(model, free)
-    C0 = None
-    if n > 0 and math.isfinite(lik.value(x0, np.empty(N))):
-        C0 = _chol_inverse(hessian(lik, x0, free, _step_size(model, x0, free), False))
-    res = minimize(lik, x0, free, C=C0, diag=diag, tol=1e-6)
+    # start from the constraint widths: the second derivatives at the initial point are rarely positive definite
+    # and cost more likelihood calls than they save
+    res = minimize(lik, x0, free, diag=_diag_guess(model, free), tol=1e-6)
     x = res.x
     f = res.f
 
