@@ -2,6 +2,6 @@
 
 from . import infer
 from .model import Likelihood, Model
-from .workspace import MODIFIER_TYPES, parse_workspace
+from .workspace import MODIFIER_TYPES, combine_workspaces, parse_workspace
 
-__all__ = ["MODIFIER_TYPES", "Likelihood", "Model", "infer", "parse_workspace"]
+__all__ = ["MODIFIER_TYPES", "Likelihood", "Model", "combine_workspaces", "infer", "parse_workspace"]

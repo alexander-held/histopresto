@@ -1,6 +1,7 @@
 // Runs the fitting jobs, in a Web Worker where possible (pages opened from file:// cannot start one
 // in Chrome; the same jobs then run on the main thread, yielding between fits).
-import { Model, infer, num, parseWorkspace } from "@histopresto/core";
+import { Model, infer, num, parseWorkspace, combineWorkspaces } from "@histopresto/core";
+import { repairNormsys } from "./repair.js";
 
 const inWorker = typeof document === "undefined" && typeof importScripts === "function";
 
@@ -13,7 +14,16 @@ function Session() {
 const J = {};
 
 J.load = async function (s, args) {
-  const ws = parseWorkspace(args.workspace);
+  // several workspaces are combined into one model
+  const parts = args.workspaces.map(({ name, text }) => {
+    try {
+      return { name, workspace: parseWorkspace(text) };
+    } catch (e) {
+      throw new Error(args.workspaces.length > 1 ? `${name}: ${e.message}` : e.message);
+    }
+  });
+  const ws = combineWorkspaces(parts);
+  ws.notes = [...ws.notes, ...repairNormsys(ws)];
   const model = new Model(ws, args.measurement || 0, { poiBounds: args.poiBounds || undefined });
   s.model = model;
   // Asimov data: the expectation at the initial parameter values takes the place of the observed data
@@ -24,6 +34,7 @@ J.load = async function (s, args) {
   const modifierCounts = {};
   for (const set of model.sets) for (const t of set.types) modifierCounts[t] = (modifierCounts[t] || 0) + 1;
   return {
+    notes: ws.notes,
     measurement: model.measurement,
     measurements: ws.measurements.map((m) => m.name),
     channels: model.channels.map((c) => ({ name: c.name, nBins: c.nBins })),

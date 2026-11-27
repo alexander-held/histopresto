@@ -145,9 +145,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
 .loader.compact .full { display: none; }
 .loader:not(.compact) .brief { display: none; }
 .loader .brief { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex: 1; min-width: 0; }
+.loader .brief .files { display: flex; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
 .loader .brief .file { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loader .brief .file + .file::before { content: "+"; margin-right: 10px; font-weight: 400; color: var(--muted); }
+.loader .brief .file button { min-height: 0; padding: 0 4px; text-decoration: none; color: var(--muted); }
 .loader .brief .dim { color: var(--muted); font-size: 0.9rem; }
-.loader button.brief { flex: none; margin-left: auto; }
+.loader .brief.actions { flex: none; margin-left: auto; gap: 0; }
 
 .error {
   margin: 12px 0 0;
@@ -227,6 +230,7 @@ table.data td.dim { color: var(--muted); }
 }
 .note { font-size: 0.88rem; color: var(--ink-2); max-width: 76ch; margin: 10px 0 0; }
 .note.warn { border-left: 3px solid var(--warn); padding-left: 10px; }
+#notes .note { margin: 0 0 10px; }
 .results { margin: 14px 0 0; }
 .scale { display: flex; gap: 8px; align-items: center; margin: 6px 0 0; font-size: 0.82rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .scale .bar { width: 180px; height: 10px; border-radius: 2px; background: linear-gradient(to right in oklab, var(--s1), var(--mid), var(--s8)); }

@@ -139,3 +139,76 @@ def parse_workspace(source):
             shown.append(f"• … and {len(problems) - 8} more")
         raise ValueError("The workspace has problems:\n" + "\n".join(shown))
     return {"channels": ws["channels"], "observations": observations, "measurements": measurements, "bindings": bindings}
+
+
+def combine_workspaces(parts):
+    """Combines parsed workspaces into one, like pyhf's Workspace.combine: every channel may be in one workspace only.
+
+    Measurements with the same name are merged, as are identical bindings; where workspaces configure a parameter
+    or the POI differently, the first one counts and a note says so. Measurements that set nothing are left out
+    if there are others (parse_workspace adds one to a workspace without measurements).
+    parts: [{name, workspace}], name is only for messages; returns a workspace like parse_workspace, with a list of notes.
+    """
+    if len(parts) == 1:
+        return {**parts[0]["workspace"], "notes": []}
+    channels = []
+    observations = {}
+    owner = {}
+    for part in parts:
+        name, workspace = part["name"], part["workspace"]
+        for channel in workspace["channels"]:
+            cn = channel["name"]
+            if cn in owner:
+                raise ValueError(f'Channel "{cn}" is in both {owner[cn]} and {name}; workspaces can only be combined if their channels differ.')
+            owner[cn] = name
+            channels.append(channel)
+            observations[cn] = workspace["observations"][cn]
+
+    merged = {}  # measurement name -> {poi, parameters, differing, pois, count}
+    defining = 0  # workspaces with a measurement that sets something
+    for part in parts:
+        own = [m for m in part["workspace"]["measurements"] if m["config"]["poi"] or m["config"]["parameters"]]
+        defining += bool(own)
+        for m in own:
+            into = merged.setdefault(m["name"], {"poi": "", "parameters": {}, "differing": [], "pois": [], "count": 0})
+            into["count"] += 1
+            poi = m["config"]["poi"]
+            if poi:
+                if poi not in into["pois"]:
+                    into["pois"].append(poi)
+                if not into["poi"]:
+                    into["poi"] = poi
+            for p in m["config"]["parameters"]:
+                known = into["parameters"].setdefault(p["name"], p)
+                if known != p and p["name"] not in into["differing"]:
+                    into["differing"].append(p["name"])
+    notes = []
+    measurements = []
+    for name, m in merged.items():
+        measurements.append({"name": name, "config": {"poi": m["poi"], "parameters": list(m["parameters"].values())}})
+        if len(m["pois"]) > 1:
+            notes.append(f'The workspaces name different parameters of interest for measurement "{name}" ({", ".join(m["pois"])}); {m["poi"]} is used.')
+        n = len(m["differing"])
+        if n:
+            shown = ", ".join(m["differing"][:10]) + (f" and {n - 10} more" if n > 10 else "")
+            notes.append(
+                f'The workspaces configure {"a parameter" if n == 1 else f"{n} parameters"} of measurement "{name}" differently ({shown}); '
+                "the settings of the first of these workspaces are used."
+            )
+    if any(m["count"] < defining for m in merged.values()):
+        notes.append("The workspaces have measurements with different names, which are not merged: each one only has the settings of the workspaces that define it.")
+
+    bindings = []
+    bound = {}  # name -> (binding, name of the workspace)
+    for part in parts:
+        for b in part["workspace"]["bindings"]:
+            if all(n in bound and bound[n][0] == b for n in b["names"]):
+                continue
+            clash = next((n for n in b["names"] if n in bound), None)
+            if clash is not None:
+                raise ValueError(f'The binding "{clash}" is defined differently in {bound[clash][1]} and {part["name"]}.')
+            for n in b["names"]:
+                bound[n] = (b, part["name"])
+            bindings.append(b)
+    measurements = measurements or parts[0]["workspace"]["measurements"]
+    return {"channels": channels, "observations": observations, "measurements": measurements, "bindings": bindings, "notes": notes}
