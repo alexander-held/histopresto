@@ -11,7 +11,7 @@ gradient, a quasi-Newton minimiser with box bounds, and the covariance from fini
 the gradient. They agree with each other to rounding and are tested against pyhf.
 
 **[Try it in the browser](https://alexander-held.github.io/histopresto/)**: load a pyhf workspace
-and fit it. Several workspaces with different channels can be loaded together and are combined.
+and fit it.
 
 | Layer | Where | What |
 |---|---|---|
