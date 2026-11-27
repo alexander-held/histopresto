@@ -1,6 +1,7 @@
 // Runs the fitting jobs, in a Web Worker where possible (pages opened from file:// cannot start one
 // in Chrome; the same jobs then run on the main thread, yielding between fits).
 import { Model, infer, num, parseWorkspace, combineWorkspaces } from "@histopresto/core";
+import { repairNormsys } from "./repair.js";
 
 const inWorker = typeof document === "undefined" && typeof importScripts === "function";
 
@@ -22,6 +23,7 @@ J.load = async function (s, args) {
     }
   });
   const ws = combineWorkspaces(parts);
+  ws.notes = [...ws.notes, ...repairNormsys(ws)];
   const model = new Model(ws, args.measurement || 0, { poiBounds: args.poiBounds || undefined });
   s.model = model;
   // Asimov data: the expectation at the initial parameter values takes the place of the observed data

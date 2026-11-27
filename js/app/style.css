@@ -230,6 +230,7 @@ table.data td.dim { color: var(--muted); }
 }
 .note { font-size: 0.88rem; color: var(--ink-2); max-width: 76ch; margin: 10px 0 0; }
 .note.warn { border-left: 3px solid var(--warn); padding-left: 10px; }
+#notes .note { margin: 0 0 10px; }
 .results { margin: 14px 0 0; }
 .scale { display: flex; gap: 8px; align-items: center; margin: 6px 0 0; font-size: 0.82rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .scale .bar { width: 180px; height: 10px; border-radius: 2px; background: linear-gradient(to right in oklab, var(--s1), var(--mid), var(--s8)); }

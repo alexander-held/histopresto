@@ -88,6 +88,7 @@ async function open(state) {
     $("poi-lo").value = summary.poiBounds[0];
     $("poi-hi").value = summary.poiBounds[1];
   }
+  $("notes").innerHTML = summary.notes.map((n) => `<p class="note warn">${esc(n)}</p>`).join("");
   $("dataset").value = state.asimov ? "asimov" : "observed";
   $("download").disabled = true;
   $("status").innerHTML = "";
