@@ -260,6 +260,7 @@ function results() {
   const k = f.inner.length;
   const out = {
     workspace: App.state.name,
+    warnings: s.notes,
     measurement: s.measurement,
     data: App.state.asimov ? "asimov" : "observed",
     fit_seconds: f.seconds,

@@ -47,4 +47,12 @@ def test_conflicts():
     b["workspace"]["measurements"][0]["config"]["parameters"][0]["inits"] = [2]
     combined = histopresto.combine_workspaces([a, b])
     assert len(combined["notes"]) == 1
+    # a workspace without measurements adds none; measurements with different names are kept, with a note
+    bare = {"name": "c", "workspace": {**b["workspace"], "measurements": histopresto.parse_workspace({**ws, "measurements": []})["measurements"]}}
+    assert histopresto.combine_workspaces([bare, a])["measurements"] == a["workspace"]["measurements"]
+    assert histopresto.combine_workspaces([bare, a])["notes"] == []
+    other = {"name": "d", "workspace": {**b["workspace"], "measurements": [{"name": "other", "config": {"poi": poi, "parameters": []}}]}}
+    two = histopresto.combine_workspaces([a, other])
+    assert [m["name"] for m in two["measurements"]] == [a["workspace"]["measurements"][0]["name"], "other"]
+    assert len(two["notes"]) == 1
     assert combined["measurements"][0]["config"]["parameters"] == [{"name": poi, "inits": [1], "bounds": [[0, 5]]}, {"name": "other", "fixed": True}]

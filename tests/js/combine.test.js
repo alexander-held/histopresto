@@ -36,5 +36,13 @@ test("conflicts", () => {
   b.workspace.measurements[0].config.parameters[0].inits = [2];
   const combined = combineWorkspaces([a, b]);
   assert.equal(combined.notes.length, 1);
+  // a workspace without measurements adds none; measurements with different names are kept, with a note
+  const bare = { name: "c", workspace: { ...b.workspace, measurements: parseWorkspace({ ...ws, measurements: undefined }).measurements } };
+  assert.deepEqual(combineWorkspaces([bare, a]).measurements, a.workspace.measurements);
+  assert.deepEqual(combineWorkspaces([bare, a]).notes, []);
+  const other = { name: "d", workspace: { ...b.workspace, measurements: [{ name: "other", config: { poi: poi, parameters: [] } }] } };
+  const two = combineWorkspaces([a, other]);
+  assert.deepEqual(two.measurements.map((m) => m.name), [a.workspace.measurements[0].name, "other"]);
+  assert.equal(two.notes.length, 1);
   assert.deepEqual(combined.measurements[0].config.parameters, [{ name: poi, inits: [1], bounds: [[0, 5]] }, { name: "other", fixed: true }]);
 });

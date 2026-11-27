@@ -145,7 +145,8 @@ def combine_workspaces(parts):
     """Combines parsed workspaces into one, like pyhf's Workspace.combine: every channel may be in one workspace only.
 
     Measurements with the same name are merged, as are identical bindings; where workspaces configure a parameter
-    or the POI differently, the first one counts and a note says so.
+    or the POI differently, the first one counts and a note says so. Measurements that set nothing are left out
+    if there are others (parse_workspace adds one to a workspace without measurements).
     parts: [{name, workspace}], name is only for messages; returns a workspace like parse_workspace, with a list of notes.
     """
     if len(parts) == 1:
@@ -163,13 +164,14 @@ def combine_workspaces(parts):
             channels.append(channel)
             observations[cn] = workspace["observations"][cn]
 
-    def canonical(v):
-        return json.dumps(v, sort_keys=True)
-
-    merged = {}  # measurement name -> {poi, parameters, differing, pois}
+    merged = {}  # measurement name -> {poi, parameters, differing, pois, count}
+    defining = 0  # workspaces with a measurement that sets something
     for part in parts:
-        for m in part["workspace"]["measurements"]:
-            into = merged.setdefault(m["name"], {"poi": "", "parameters": {}, "differing": [], "pois": []})
+        own = [m for m in part["workspace"]["measurements"] if m["config"]["poi"] or m["config"]["parameters"]]
+        defining += bool(own)
+        for m in own:
+            into = merged.setdefault(m["name"], {"poi": "", "parameters": {}, "differing": [], "pois": [], "count": 0})
+            into["count"] += 1
             poi = m["config"]["poi"]
             if poi:
                 if poi not in into["pois"]:
@@ -178,7 +180,7 @@ def combine_workspaces(parts):
                     into["poi"] = poi
             for p in m["config"]["parameters"]:
                 known = into["parameters"].setdefault(p["name"], p)
-                if canonical(known) != canonical(p) and p["name"] not in into["differing"]:
+                if known != p and p["name"] not in into["differing"]:
                     into["differing"].append(p["name"])
     notes = []
     measurements = []
@@ -191,22 +193,22 @@ def combine_workspaces(parts):
             shown = ", ".join(m["differing"][:10]) + (f" and {n - 10} more" if n > 10 else "")
             notes.append(
                 f'The workspaces configure {"a parameter" if n == 1 else f"{n} parameters"} of measurement "{name}" differently ({shown}); '
-                "the settings of the workspace loaded first are used."
+                "the settings of the first of these workspaces are used."
             )
-    if len(measurements) > 1:
+    if any(m["count"] < defining for m in merged.values()):
         notes.append("The workspaces have measurements with different names, which are not merged: each one only has the settings of the workspaces that define it.")
 
     bindings = []
-    bound = {}
+    bound = {}  # name -> (binding, name of the workspace)
     for part in parts:
         for b in part["workspace"]["bindings"]:
-            key = canonical(b)
-            if all(n in bound and bound[n][0] == key for n in b["names"]):
+            if all(n in bound and bound[n][0] == b for n in b["names"]):
                 continue
             clash = next((n for n in b["names"] if n in bound), None)
             if clash is not None:
                 raise ValueError(f'The binding "{clash}" is defined differently in {bound[clash][1]} and {part["name"]}.')
             for n in b["names"]:
-                bound[n] = (key, part["name"])
+                bound[n] = (b, part["name"])
             bindings.append(b)
+    measurements = measurements or parts[0]["workspace"]["measurements"]
     return {"channels": channels, "observations": observations, "measurements": measurements, "bindings": bindings, "notes": notes}

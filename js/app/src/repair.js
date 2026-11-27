@@ -10,8 +10,10 @@ function repairNormsys(ws) {
     for (const sample of channel.samples) {
       sample.modifiers = sample.modifiers.map((mod) => {
         if (mod.type !== "normsys" || (mod.data.hi > 0 && mod.data.lo > 0)) return mod;
-        cases.push(`${mod.name} (${mod.data.hi > 0 ? "" : `up ${mod.data.hi}`}${mod.data.hi > 0 || mod.data.lo > 0 ? "" : ", "}${mod.data.lo > 0 ? "" : `down ${mod.data.lo}`}) for ${sample.name} in ${channel.name}`);
-        return { ...mod, data: { hi: mod.data.hi > 0 ? mod.data.hi : NORMSYS_FLOOR, lo: mod.data.lo > 0 ? mod.data.lo : NORMSYS_FLOOR } };
+        const { hi, lo } = mod.data;
+        const which = [!(hi > 0) && `up ${hi}`, !(lo > 0) && `down ${lo}`].filter(Boolean).join(", ");
+        cases.push(`${mod.name} (${which}) for ${sample.name} in ${channel.name}`);
+        return { ...mod, data: { hi: hi > 0 ? hi : NORMSYS_FLOOR, lo: lo > 0 ? lo : NORMSYS_FLOOR } };
       });
     }
   }
