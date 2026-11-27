@@ -17,8 +17,9 @@ const App = {
   },
 };
 
-function freshState(name, source) {
-  return { name, source, measurement: 0, poiBounds: null, asimov: false, summary: null, fit: null, exact: new Map(), scan: null, scan2d: null, limit: null, significance: null, ui: { ...App.presets } };
+// sources: [{name, text}], the workspaces that are combined into the model
+function freshState(sources) {
+  return { name: sources.map((s) => s.name).join(" + "), sources, measurement: 0, poiBounds: null, asimov: false, summary: null, fit: null, exact: new Map(), scan: null, scan2d: null, limit: null, significance: null, ui: { ...App.presets } };
 }
 
 // ----- errors, progress -----
@@ -61,18 +62,20 @@ App.run = async function (job, args, label) {
 };
 
 // ----- loading -----
-async function load(name, source) {
-  const state = freshState(name, source);
-  await open(state);
+async function load(sources) {
+  await open(freshState(sources));
 }
 async function open(state) {
-  const summary = await App.run("load", { workspace: state.source, measurement: state.measurement, poiBounds: state.poiBounds, asimov: state.asimov }, "reading the workspace");
+  const summary = await App.run("load", { workspaces: state.sources, measurement: state.measurement, poiBounds: state.poiBounds, asimov: state.asimov }, "reading the workspace");
   if (!summary) return;
   state.summary = summary;
   App.state = state;
   assignColours(summary);
   $("loader").classList.add("compact");
-  $("file-name").textContent = state.name;
+  const several = state.sources.length > 1;
+  $("files").innerHTML = state.sources
+    .map((src, i) => `<span class="file">${esc(src.name)}${several ? ` <button class="quiet" data-remove="${i}" title="Remove this workspace" aria-label="Remove ${esc(src.name)}">×</button>` : ""}</span>`)
+    .join("");
   $("file-info").textContent = `${summary.channels.length} channel${summary.channels.length === 1 ? "" : "s"}, ${summary.nBins} bins, ${summary.samples.length} samples, ${summary.nPars} parameters`;
   $("workspace").hidden = false;
   const sel = $("measurement");
@@ -279,24 +282,38 @@ App.start = function () {
   App.engine = new Engine("worker.js");
   wireView();
   const loader = $("loader");
-  const readFile = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => load(file.name, reader.result);
-    reader.onerror = () => showError(`Could not read ${file.name}.`);
-    reader.readAsText(file);
+  // several files are combined; with add they join the workspaces that are loaded already
+  const readFiles = async (files, add) => {
+    if (!files.length || App.busy) return;
+    let sources;
+    try {
+      sources = await Promise.all(Array.from(files, async (file) => ({ name: file.name, text: await file.text() })));
+    } catch (e) {
+      return showError("Could not read the files.");
+    }
+    load(add && App.state ? [...App.state.sources, ...sources] : sources);
   };
-  $("choose").onclick = () => $("file").click();
+  let adding = false;
+  const choose = (add) => {
+    adding = add;
+    $("file").click();
+  };
+  $("choose").onclick = () => choose(false);
+  $("add").onclick = () => choose(true);
   $("file").onchange = (e) => {
-    readFile(e.target.files[0]);
+    readFiles(Array.from(e.target.files), adding);
     e.target.value = "";
+  };
+  $("files").onclick = (e) => {
+    const i = e.target.dataset.remove;
+    if (i !== undefined && !App.busy) load(App.state.sources.filter((_, j) => j !== Number(i)));
   };
   $("paste-toggle").onclick = () => {
     $("paste").hidden = !$("paste").hidden;
     if (!$("paste").hidden) $("paste-text").focus();
   };
   $("paste-load").onclick = () => {
-    if ($("paste-text").value.trim()) load("pasted workspace", $("paste-text").value);
+    if ($("paste-text").value.trim()) load([{ name: "pasted workspace", text: $("paste-text").value }]);
   };
   $("another").onclick = () => {
     loader.classList.remove("compact");
@@ -310,7 +327,7 @@ App.start = function () {
     });
   }
   for (const type of ["dragleave", "drop"]) document.addEventListener(type, (e) => (e.preventDefault(), loader.classList.remove("over")));
-  document.addEventListener("drop", (e) => readFile(e.dataTransfer.files[0]));
+  document.addEventListener("drop", (e) => readFiles(Array.from(e.dataTransfer.files), false));
 
   // examples are separate scripts, loaded on demand (this also works from file://)
   const pendingExamples = {};
@@ -320,7 +337,7 @@ App.start = function () {
     const id = e.target.dataset.example;
     if (!id) return;
     const ex = window.HF_EXAMPLES.find((x) => x.id === id);
-    pendingExamples[id] = (workspace) => load(ex.title, JSON.stringify(workspace));
+    pendingExamples[id] = (workspace) => load([{ name: ex.title, text: JSON.stringify(workspace) }]);
     const script = document.createElement("script");
     script.src = `examples/${id}.js`;
     script.onerror = () => showError(`Could not load the example "${ex.title}".`);
@@ -339,8 +356,8 @@ App.start = function () {
   $("cancel").onclick = () => App.engine.cancel();
   // load the workspace again with one of the settings changed
   const reopen = (change) => {
-    const { name, source, measurement, poiBounds, asimov, ui } = App.state;
-    open(Object.assign(freshState(name, source), { measurement, poiBounds, asimov, ui }, change));
+    const { sources, measurement, poiBounds, asimov, ui } = App.state;
+    open(Object.assign(freshState(sources), { measurement, poiBounds, asimov, ui }, change));
   };
   $("measurement").onchange = (e) => reopen({ measurement: Number(e.target.value), poiBounds: null });
   $("dataset").onchange = (e) => reopen({ asimov: e.target.value === "asimov" });
@@ -352,7 +369,7 @@ App.start = function () {
   };
   $("poi-lo").onchange = rebound;
   $("poi-hi").onchange = rebound;
-  $("download").onclick = () => App.download(`${App.state.name.replace(/\.json$/i, "")}_fit_results.json`, JSON.stringify(results(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v), 1), "application/json");
+  $("download").onclick = () => App.download(`${App.state.sources.length > 1 ? "combined" : App.state.name.replace(/\.json$/i, "")}_fit_results.json`, JSON.stringify(results(), (k, v) => (ArrayBuffer.isView(v) ? Array.from(v) : v), 1), "application/json");
 
   // redraw figures when the layout changes between narrow and wide
   let key = null;

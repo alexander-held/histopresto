@@ -32,6 +32,7 @@ App.view({
       `<p class="note">Measurement <b>${esc(s.measurement)}</b>` +
       (s.poiIndex >= 0 ? `, parameter of interest <span class="mono">${esc(s.poiName)}</span>` : `, no parameter of interest`) +
       `. Modifiers: ${types.map(([t, n]) => `${n} ${t}`).join(", ")}.</p>` +
+      s.notes.map((n) => `<p class="note warn">${esc(n)}</p>`).join("") +
       `<h2>Channels</h2><div class="table-wrap"><table class="data"><tr><th>channel</th><th class="num">bins</th><th class="num">samples</th><th class="num">data</th><th class="num">pre-fit expectation</th></tr>` +
       s.prefit.channels
         .map((ch) => `<tr><td>${esc(ch.name)}</td><td class="num">${ch.data.length}</td><td class="num">${ch.samples.length}</td><td class="num">${yieldFmt(ch.dataSum)}</td><td class="num">${yieldFmt(ch.sum)} <span class="unc">± ${yieldFmt(ch.sumUnc)}</span></td></tr>`)

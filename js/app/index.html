@@ -22,9 +22,9 @@
   <section id="loader" class="loader">
     <div class="full">
       <h1>Fit a pyhf workspace</h1>
-      <p>Drop a workspace JSON file here to fit it and look at pulls, correlations, the ranking, likelihood scans, limits and pre- and post-fit yields.</p>
+      <p>Drop a workspace JSON file here to fit it and look at pulls, correlations, the ranking, likelihood scans, limits and pre- and post-fit yields. Several files are combined into one model.</p>
       <div class="row">
-        <button id="choose" class="primary">Choose file</button>
+        <button id="choose" class="primary">Choose files</button>
         <button id="paste-toggle">Paste JSON</button>
       </div>
       <div id="paste" hidden>
@@ -34,11 +34,14 @@
       <div class="examples">or start from an example<div class="row" id="examples"></div></div>
     </div>
     <div class="brief">
-      <span class="file" id="file-name"></span>
+      <span class="files" id="files"></span>
       <span class="dim" id="file-info"></span>
     </div>
-    <button id="another" class="brief quiet">Load another workspace</button>
-    <input id="file" type="file" accept=".json,application/json" hidden>
+    <span class="brief actions">
+      <button id="add" class="quiet" title="Combine the loaded workspace with further ones; their channels need to differ">Add workspace</button>
+      <button id="another" class="quiet">Load another workspace</button>
+    </span>
+    <input id="file" type="file" accept=".json,application/json" multiple hidden>
   </section>
   <div id="error" class="error" role="alert" hidden></div>
 

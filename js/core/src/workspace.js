@@ -121,4 +121,67 @@ function parseWorkspace(input) {
   return { channels: ws.channels, observations, measurements, bindings };
 }
 
-export { MODIFIER_TYPES, parseWorkspace };
+// Combines parsed workspaces into one, like pyhf's Workspace.combine: every channel may be in one workspace only.
+// Measurements with the same name are merged, as are identical bindings; where workspaces configure a parameter
+// or the POI differently, the first one counts and a note says so.
+// parts: [{name, workspace}], name is only for messages; returns a workspace like parseWorkspace, with a list of notes
+function combineWorkspaces(parts) {
+  if (parts.length === 1) return { ...parts[0].workspace, notes: [] };
+  const channels = [];
+  const observations = {};
+  const owner = {};
+  for (const { name, workspace } of parts) {
+    for (const channel of workspace.channels) {
+      if (channel.name in owner) throw new Error(`Channel "${channel.name}" is in both ${owner[channel.name]} and ${name}; workspaces can only be combined if their channels differ.`);
+      owner[channel.name] = name;
+      channels.push(channel);
+      observations[channel.name] = workspace.observations[channel.name];
+    }
+  }
+
+  const canonical = (v) => JSON.stringify(v, (k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+  const merged = new Map(); // measurement name -> {poi, parameters: Map, differing: Set, pois: Set}
+  for (const { workspace } of parts) {
+    for (const m of workspace.measurements) {
+      if (!merged.has(m.name)) merged.set(m.name, { poi: "", parameters: new Map(), differing: new Set(), pois: new Set() });
+      const into = merged.get(m.name);
+      if (m.config.poi) {
+        into.pois.add(m.config.poi);
+        if (!into.poi) into.poi = m.config.poi;
+      }
+      for (const p of m.config.parameters) {
+        const known = into.parameters.get(p.name);
+        if (!known) into.parameters.set(p.name, p);
+        else if (canonical(known) !== canonical(p)) into.differing.add(p.name);
+      }
+    }
+  }
+  const notes = [];
+  const measurements = [];
+  for (const [name, m] of merged) {
+    measurements.push({ name, config: { poi: m.poi, parameters: [...m.parameters.values()] } });
+    if (m.pois.size > 1) notes.push(`The workspaces name different parameters of interest for measurement "${name}" (${[...m.pois].join(", ")}); ${m.poi} is used.`);
+    if (m.differing.size) {
+      const shown = [...m.differing].slice(0, 10).join(", ") + (m.differing.size > 10 ? ` and ${m.differing.size - 10} more` : "");
+      notes.push(`The workspaces configure ${m.differing.size === 1 ? "a parameter" : `${m.differing.size} parameters`} of measurement "${name}" differently (${shown}); the settings of the workspace loaded first are used.`);
+    }
+  }
+  if (measurements.length > 1) notes.push(`The workspaces have measurements with different names, which are not merged: each one only has the settings of the workspaces that define it.`);
+
+  const bindings = [];
+  const bound = {};
+  for (const { name, workspace } of parts) {
+    for (const b of workspace.bindings) {
+      const key = canonical(b);
+      const fresh = b.names.filter((n) => bound[n] === undefined);
+      if (fresh.length === 0 && b.names.every((n) => bound[n].key === key)) continue;
+      const clash = b.names.find((n) => bound[n] !== undefined);
+      if (clash !== undefined) throw new Error(`The binding "${clash}" is defined differently in ${bound[clash].name} and ${name}.`);
+      for (const n of b.names) bound[n] = { key, name };
+      bindings.push(b);
+    }
+  }
+  return { channels, observations, measurements, bindings, notes };
+}
+
+export { MODIFIER_TYPES, parseWorkspace, combineWorkspaces };
